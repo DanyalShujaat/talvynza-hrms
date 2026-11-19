@@ -110,23 +110,23 @@ const regSchema = z.object({
 })
 
 export function RegisterPage() {
-  const [done, setDone] = React.useState<string | null>(null)
+  const [done, setDone] = React.useState<{ email: string; verificationRequired: boolean } | null>(null)
   const [serverError, setServerError] = React.useState<string | null>(null)
   const { register, handleSubmit, formState: { errors } } = useForm({ resolver: zodResolver(regSchema), defaultValues: { country: 'PK', expected_employee_count: 25 } })
   const reg = useMutation({
     mutationFn: (v: z.output<typeof regSchema>) => {
       const c = COUNTRIES.find((x) => x.code === v.country)!
-      return api('/auth/register', { method: 'POST', body: { ...v, currency: c.currency, timezone: c.tz } })
+      return api<{ verification_required: boolean }>('/auth/register', { method: 'POST', body: { ...v, currency: c.currency, timezone: c.tz } })
     },
-    onSuccess: (_d, v) => setDone(v.email),
+    onSuccess: (data, v) => setDone({ email: v.email, verificationRequired: data.verification_required }),
     onError: (e) => setServerError(errorMessage(e)),
   })
   if (done) {
     return (
-      <AuthLayout title="Check your inbox">
+      <AuthLayout title={done.verificationRequired ? 'Check your inbox' : 'Your registration is ready'}>
         <Card><CardBody className="flex flex-col items-center gap-3 text-center">
           <MailCheck className="h-10 w-10 text-primary" />
-          <p className="text-sm">If the details are valid, we sent a verification link to <strong>{done}</strong>. Verify your email, then sign in to finish setting up your organization.</p>
+          <p className="text-sm">{done.verificationRequired ? <>If the details are valid, we sent a verification link to <strong>{done.email}</strong>. Verify your email, then sign in.</> : <>If this is a new account, you can now sign in with <strong>{done.email}</strong> and finish setting up your organization.</>}</p>
           <Button asChild variant="outline"><Link to="/login">Go to sign in</Link></Button>
         </CardBody></Card>
       </AuthLayout>

@@ -87,7 +87,8 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
                      organization_name=body.organization_name, country=body.country, currency=body.currency,
                      timezone=body.timezone, expected_employee_count=body.expected_employee_count,
                      ip=client_ip(request))
-    return {"message": "If the details are valid, a verification email has been sent."}
+    verification_required = get_settings().require_email_verification
+    return {"message": "Registration received.", "verification_required": verification_required}
 
 
 @router.post("/verify-email", dependencies=[limited])

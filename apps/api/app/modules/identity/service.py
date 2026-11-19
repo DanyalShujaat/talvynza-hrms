@@ -82,12 +82,14 @@ def register(
     db.flush()
     tenancy.create_tenant(db, identity, name=organization_name, country=country, currency=currency,
                           timezone=timezone, expected_employee_count=expected_employee_count, ip=ip)
-    token = _issue_email_token(db, identity, "verify_email", timedelta(hours=24))
+    verification_required = get_settings().require_email_verification
+    token = _issue_email_token(db, identity, "verify_email", timedelta(hours=24)) if verification_required else None
     security_event(db, "register", identity_id=identity.id, ip=ip)
     db.commit()
-    send_email(email, "Verify your Talvynza HRMS email",
-               f"Welcome, {identity.full_name}!\n\nVerify your email: "
-               f"{get_settings().frontend_url}/verify-email?token={token}\n\nThe link expires in 24 hours.")
+    if token:
+        send_email(email, "Verify your Talvynza HRMS email",
+                   f"Welcome, {identity.full_name}!\n\nVerify your email: "
+                   f"{get_settings().frontend_url}/verify-email?token={token}\n\nThe link expires in 24 hours.")
     events.publish("identity.registered", {"identity_id": identity.id})
 
 
