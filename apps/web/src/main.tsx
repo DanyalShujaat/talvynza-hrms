@@ -6,7 +6,6 @@ import { Toaster } from 'sonner'
 import { AppShell } from '@/components/layout/AppShell'
 import { ApiError } from '@/lib/api'
 import { LandingPage } from '@/modules/platform/landing'
-import { DemoPage } from '@/modules/platform/demo'
 import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
 import { ForgotPasswordPage, JoinPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from '@/modules/platform/auth'
 import './index.css'
@@ -76,7 +75,7 @@ export function App() {
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route path="/welcome" element={<LandingPage />} />
-            <Route path="/demo" element={<DemoPage />} />
+            <Route path="/demo" element={<Navigate to="/welcome" replace />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />

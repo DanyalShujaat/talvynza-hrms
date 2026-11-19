@@ -12,7 +12,6 @@ import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Avatar } from '@/components/ui/extras'
 import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } from '@/components/ui/menu'
 import { ApiError, api, errorMessage } from '@/lib/api'
-import { useGet } from '@/lib/hooks'
 import { useMe } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 import { useUi } from '@/stores/ui'
@@ -36,7 +35,6 @@ export function Brand({ compact }: { compact?: boolean }) {
     </Link>
   )
 }
-
 function ThemeMenu() {
   const { theme, setTheme } = useUi()
   const Icon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor
@@ -131,7 +129,6 @@ function Sidebar({ compact, onNavigate }: { compact: boolean; onNavigate?: () =>
   const mine = isMySpace(pathname)
   const admin = hasAdminSide(perms)
   const groups = visibleGroups(mine && me?.employee ? MY_SPACE : ADMIN, perms)
-  const demo = useGet<unknown[]>('/demo/accounts')
   return (
     <>
       <div className="space-y-3 border-b border-border p-3">
@@ -157,7 +154,6 @@ function Sidebar({ compact, onNavigate }: { compact: boolean; onNavigate?: () =>
           </div>
         ))}
       </nav>
-      {demo.data && <div className="border-t border-border p-3"><Link to="/demo" onClick={onNavigate} className="flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2.5 text-xs font-semibold text-warning" title="Switch demo role"><UsersIcon />{!compact && <span>Switch demo role<span className="block text-[10px] font-normal">Fictional data · local demo</span></span>}</Link></div>}
     </>
   )
 }
@@ -237,5 +233,3 @@ export function AppShell() {
     </div>
   )
 }
-
-function UsersIcon() { return <UserRound className="h-4 w-4 shrink-0" /> }

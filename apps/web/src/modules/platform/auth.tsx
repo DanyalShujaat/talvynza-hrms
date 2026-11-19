@@ -86,7 +86,6 @@ export function LoginPage() {
         <Button type="submit" size="lg" className="w-full" loading={login.isPending}>Sign in</Button>
         <div className="flex justify-between text-sm"><Link to="/forgot-password" className="text-primary hover:underline">Forgot password?</Link><Link to="/register" className="text-primary hover:underline">Create an account</Link></div>
       </form>
-      <p className="mt-6 border-t border-border pt-5 text-center text-xs text-muted">Trying the local workspace? <Link to="/demo" className="font-semibold text-primary">Explore demo accounts</Link></p>
     </AuthLayout>
   )
 }
