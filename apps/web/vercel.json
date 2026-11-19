@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://nexora-hrms-production.up.railway.app/api/:path*" },
-    { "source": "/health", "destination": "https://nexora-hrms-production.up.railway.app/health" }
+    { "source": "/health", "destination": "https://nexora-hrms-production.up.railway.app/health" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
