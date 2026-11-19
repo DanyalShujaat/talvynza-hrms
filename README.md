@@ -44,6 +44,19 @@ docker compose up --build   # web on http://localhost:8080
 ```
 The Docker files have not been run yet. See known limitations.
 
+## Deploy on Railway
+
+Create a Railway project from the `master` branch, then add PostgreSQL and Redis services. Deploy two services from this
+repository: the API service uses `infrastructure/docker/api.Dockerfile` and listens on port `8000`; the web service uses
+`infrastructure/docker/web.Dockerfile` and listens on port `80`.
+
+Set `API_UPSTREAM` on the web service to the API service's private Railway hostname and port, for example
+`api.railway.internal:8000`. Set the API service's `TALVYNZA_DATABASE_URL` and `TALVYNZA_REDIS_URL` from the Railway
+PostgreSQL and Redis references. Production also requires a strong `TALVYNZA_SECRET_KEY`, `TALVYNZA_ENVIRONMENT=production`,
+SMTP settings, and matching `TALVYNZA_FRONTEND_URL` and `TALVYNZA_CORS_ORIGINS`. Add a persistent volume mounted at
+`/srv/storage` to the API service for uploaded files. Use `/health` as the API healthcheck and expose the web service's
+port `80` through its Railway domain.
+
 ## Tests
 ```powershell
 cd apps/api ; .\.venv\Scripts\pytest -q ; .\.venv\Scripts\ruff check app tests
