@@ -30,3 +30,4 @@ apps/web/e2e/.tmp/
 apps/api/e2e.db
 apps/api/e2e-storage/
 apps/api/dev.db
+.vercel
