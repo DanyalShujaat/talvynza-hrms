@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, MailCheck } from 'lucide-react'
+import { ArrowRight, CheckCircle2, MailCheck, Users, CalendarDays, Wallet, Sparkles } from 'lucide-react'
 import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -10,34 +10,19 @@ import { Button } from '@/components/ui/button'
 import { Card, CardBody, ErrorState } from '@/components/ui/card'
 import { Field, Input, Select } from '@/components/ui/form'
 import { ApiError, api, errorMessage } from '@/lib/api'
+import './auth.css'
 
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen bg-surface lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <div className="brand-gradient relative hidden flex-col justify-between overflow-hidden p-12 text-white lg:flex">
-        <div aria-hidden className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10" />
-        <div aria-hidden className="absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/10" />
-        <div className="relative flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white p-1.5"><img src="/logo-mark.png" alt="" className="h-full w-full" /></span>
-          <span className="leading-none"><span className="block font-display text-xl font-extrabold">Talvynza</span><span className="text-[11px] font-bold tracking-[0.25em] opacity-90">HRMS</span></span>
-        </div>
-        <div className="relative">
-          <h2 className="max-w-md font-display text-[34px] font-extrabold leading-[1.15]">People, time and pay in one place.</h2>
-          <ul className="mt-6 space-y-2.5 text-[15px] text-white/90">
-            {['Attendance, leave and shifts', 'Payroll with Pakistan income tax', 'Hiring, onboarding and exits', 'A personal space for every employee'].map((t) => (
-              <li key={t} className="flex items-center gap-2.5"><CheckCircle2 className="h-[18px] w-[18px] shrink-0" aria-hidden />{t}</li>))}
-          </ul>
-        </div>
-        <p className="relative text-xs text-white/75">Each organization's data is kept separate and every change is logged.</p>
+    <div className="auth-page grid min-h-screen lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="auth-stage relative hidden flex-col justify-between overflow-hidden p-10 text-white lg:flex xl:p-14">
+        <Link to="/welcome" className="relative z-10 flex w-fit items-center gap-3" aria-label="Talvynza home"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white p-1.5"><img src="/logo-mark.png" alt="" className="h-full w-full" /></span><span className="font-display text-xl font-extrabold">Talvynza<span className="text-cyan-300">.</span></span></Link>
+        <div className="relative z-10 my-12 max-w-xl"><p className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-white/10 px-4 py-2 text-xs font-semibold text-cyan-100"><Sparkles className="h-4 w-4" /> Your connected workspace starts here</p><h2 className="mt-6 font-display text-4xl font-extrabold leading-[1.12] tracking-tight xl:text-5xl">Bring your people, time and pay <span className="text-cyan-200">together.</span></h2><p className="mt-5 max-w-md text-base leading-7 text-slate-300">A clearer home for the entire employee journey, from the first application to every working day.</p>
+          <div className="auth-preview mt-10"><div className="flex items-center justify-between border-b border-white/10 px-5 py-4"><span className="text-xs font-bold uppercase tracking-widest text-cyan-200">Your Talvynza workspace</span><span className="h-2 w-2 rounded-full bg-emerald-400" /></div><div className="grid grid-cols-3 gap-3 p-5">{[[Users,'People','Connected'],[CalendarDays,'Time','In sync'],[Wallet,'Pay','In context']].map(([Icon,label,detail])=><div key={label as string} className="rounded-xl border border-white/10 bg-white/[.06] p-4"><Icon className="mb-5 h-5 w-5 text-cyan-200" /><strong className="block text-sm">{label as string}</strong><small className="text-slate-400">{detail as string}</small></div>)}</div></div>
+        </div><p className="relative z-10 flex items-center gap-2 text-xs text-slate-300"><CheckCircle2 className="h-4 w-4 text-teal-300" /> One secure workspace for your team</p>
       </div>
-      <div className="flex items-center justify-center p-6">
-        <div className="w-full max-w-[400px]">
-          <Link to="/welcome" className="mb-8 inline-block text-sm text-muted hover:text-primary">← Back to Talvynza</Link>
-          <img src="/logo-mark.png" alt="Talvynza HRMS" className="mb-6 h-12 w-12 lg:hidden" />
-          <h1 className="text-[26px] font-bold tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1.5 text-sm text-muted">{subtitle}</p>}
-          <div className="mt-7">{children}</div>
-        </div>
+      <div className="auth-form-side flex items-center justify-center px-5 py-10 sm:px-10 lg:py-14">
+        <div className="auth-card w-full max-w-[510px]"><div className="flex items-center justify-between gap-4"><Link to="/welcome" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-[#0f4bb5]">← Back to Talvynza</Link><img src="/logo-mark.png" alt="Talvynza HRMS" className="h-9 w-9 lg:hidden" /></div><div className="mt-8"><p className="text-xs font-bold uppercase tracking-[.18em] text-[#078e91]">Talvynza HRMS</p><h1 className="mt-2 font-display text-[30px] font-extrabold tracking-tight text-[#10233f]">{title}</h1>{subtitle && <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p>}</div><div className="mt-7">{children}</div><div className="mt-6 flex items-center gap-2 border-t border-slate-200 pt-5 text-xs text-slate-400"><CheckCircle2 className="h-4 w-4 text-teal-600" /> Your workspace is private to your organization <ArrowRight className="ml-auto h-3 w-3 text-teal-600" /></div></div>
       </div>
     </div>
   )
