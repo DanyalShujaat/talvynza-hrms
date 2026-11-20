@@ -1,5 +1,6 @@
 """Imports every model module so Alembic and create_all see the full metadata. Add new modules here."""
 from app.db.base import Base  # noqa: F401
+from app.modules.ai import models as _ai  # noqa: F401
 from app.modules.assets import models as _assets  # noqa: F401
 from app.modules.attendance import models as _attendance  # noqa: F401
 from app.modules.employees import models as _employees  # noqa: F401

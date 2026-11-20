@@ -45,6 +45,7 @@ def main():
            "TALVYNZA_EMAIL_BACKEND": "console", "TALVYNZA_LOG_JSON": "false", "TALVYNZA_REDIS_URL": "",
            "TALVYNZA_REQUIRE_EMAIL_VERIFICATION": "false", "TALVYNZA_RATE_LIMIT_ENABLED": "false",
            "TALVYNZA_CORS_ORIGINS": web_url, "TALVYNZA_FRONTEND_URL": web_url,
+           "TALVYNZA_AI_ENABLED": "true", "TALVYNZA_AI_OLLAMA_URL": "http://127.0.0.1:11434",
            "VITE_API_PROXY": base}
     # Empty Redis URL selects the in-process development limiter; this demo needs no broker.
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=API, env=env, check=True)
@@ -62,7 +63,7 @@ def main():
                     sys.exit(f"Demo preparation failed. See {STATE / 'seed.log'}. Existing data was preserved.")
             children.append(subprocess.Popen(["node", "node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", str(args.web_port), "--strictPort"], cwd=WEB, env=env, stdout=web_log, stderr=subprocess.STDOUT, **hidden))
             wait_ready(web_url, children[1])
-            print(f"\nTalvynza is ready: {web_url}\nChoose a role: {web_url}/demo\nData and logs: {STATE}\nKeep this terminal open. Press Ctrl+C to stop.\n", flush=True)
+            print(f"\nTalvynza is ready: {web_url}\nSign in: {web_url}/login\nData and logs: {STATE}\nKeep this terminal open. Press Ctrl+C to stop.\n", flush=True)
             while all(child.poll() is None for child in children):
                 time.sleep(1)
     except KeyboardInterrupt:

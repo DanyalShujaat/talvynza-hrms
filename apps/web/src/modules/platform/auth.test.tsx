@@ -41,8 +41,8 @@ describe('auth pages', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password')
   })
 
-  it('registers with country-derived currency and time zone, then shows the check-inbox state', async () => {
-    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(() => res(202, { message: 'ok' }))
+  it('registers with country-derived currency and time zone, then shows the ready state', async () => {
+    const f = vi.spyOn(globalThis, 'fetch').mockImplementation(() => res(202, { verification_required: false }))
     render(wrap(<RegisterPage />))
     await userEvent.type(screen.getByLabelText(/your full name/i), 'Sam Tester')
     await userEvent.type(screen.getByLabelText(/work email/i), 'sam@acme.co')
@@ -52,6 +52,6 @@ describe('auth pages', () => {
     await waitFor(() => expect(f).toHaveBeenCalled())
     const body = JSON.parse(f.mock.calls[0]![1]!.body as string)
     expect(body).toMatchObject({ country: 'PK', currency: 'PKR', timezone: 'Asia/Karachi', organization_name: 'Acme Ltd' })
-    expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument()
+    expect(await screen.findByText(/your registration is ready/i)).toBeInTheDocument()
   })
 })

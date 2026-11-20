@@ -4,8 +4,9 @@ from __future__ import annotations
 import base64
 import hashlib
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import model_validator
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 INSECURE_DEFAULT_SECRET = "dev-only-insecure-secret-change-me"
@@ -52,6 +53,14 @@ class Settings(BaseSettings):
     demo_accounts_file: str | None = None  # explicit local-only fictional demo accounts
     trial_days: int = 14
     log_json: bool = True
+
+    # Tali uses a local Ollama model. Disabled until an operator opts in.
+    ai_enabled: bool = False
+    ai_provider: Literal["ollama", "groq"] = "ollama"
+    ai_ollama_url: str = "http://127.0.0.1:11434"
+    ai_model: str = "qwen3:0.6b"
+    ai_groq_api_key: SecretStr | None = None
+    ai_groq_model: str = "openai/gpt-oss-20b"
 
     @model_validator(mode="after")
     def _validate(self) -> Settings:

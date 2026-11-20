@@ -22,6 +22,8 @@ import { guideFor } from './guides'
 import { ModuleWalkthrough } from './ModuleWalkthrough'
 import { Notifications } from './Notifications'
 
+const TaliAssistant = React.lazy(() => import('@/components/assistant/TaliAssistant').then(module => ({ default: module.TaliAssistant })))
+
 export function Brand({ compact }: { compact?: boolean }) {
   return (
     <Link to="/" className="flex items-center gap-2.5" aria-label="Talvynza HRMS home">
@@ -230,6 +232,7 @@ export function AppShell() {
       </div>
       {help && moduleGuide && allowedPath(pathname, perms) && <ModuleWalkthrough guide={moduleGuide} step={guideStep} onStep={setGuideStep} onClose={closeGuide} />}
       <CommandPalette open={palette} onOpenChange={setPalette} />
+      {!help && !palette && !drawer && <React.Suspense fallback={null}><TaliAssistant /></React.Suspense>}
     </div>
   )
 }

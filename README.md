@@ -37,6 +37,29 @@ cd apps/api ; .\.venv\Scripts\python scripts\seed_demo.py     # API must be runn
 ```
 It creates the organization "Northwind Demo" and prints the owner login.
 
+## Tali's local AI
+
+Tali can answer questions using the signed-in employee's own tasks and leave balances. It can propose creating a
+personal task or changing one of that employee's task statuses; the person must confirm each change. Conversation
+requests stay on your computer when Ollama runs locally. The feature is off by default on other servers.
+
+```powershell
+docker run -d --name talvynza-ollama --restart unless-stopped -p 127.0.0.1:11434:11434 -v talvynza-ollama:/root/.ollama ollama/ollama:latest
+docker exec talvynza-ollama ollama pull qwen3:0.6b
+powershell -ExecutionPolicy Bypass -File scripts/start-demo.ps1
+```
+
+If the container already exists, use `docker start talvynza-ollama` instead of `docker run`. Open
+`http://localhost:5180/login` and click Tali in the lower right. The model needs about 1.4 GB of disk space and
+may respond slowly on a CPU. Set `TALVYNZA_AI_ENABLED=true` for another local API process; see
+[.env.example](.env.example) for the model and URL settings.
+
+For the hosted API, configure `TALVYNZA_AI_PROVIDER=groq`, `TALVYNZA_AI_ENABLED=true`, and a
+`TALVYNZA_AI_GROQ_API_KEY` secret in Railway. Groq's free tier is rate limited. The assistant sends only the signed-in
+employee's name, recent personal task titles and statuses, leave balances, the current question, and recent chat
+turns. No payroll or other employee records are included. Groq's inference data controls should be reviewed before
+using real employee information.
+
 ## Run with PostgreSQL and Redis (Docker)
 ```bash
 cp .env.example .env     # set TALVYNZA_SECRET_KEY and POSTGRES_PASSWORD

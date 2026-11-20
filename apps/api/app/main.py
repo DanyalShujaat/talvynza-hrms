@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.db import session as dbsession
+from app.modules.ai.router import router as assistant_router
 from app.modules.assets.router import router as assets_router
 from app.modules.attendance.router import router as attendance_router
 from app.modules.attendance.router import shifts_router
@@ -68,7 +69,7 @@ def create_app() -> FastAPI:
     v1.include_router(demo_router)
     v1.include_router(me_router)
     v1.include_router(org_router)
-    for r in (structure_router, employees_router, attendance_router, shifts_router, leave_router,
+    for r in (assistant_router, structure_router, employees_router, attendance_router, shifts_router, leave_router,
               notifications_router, payroll_router, salary_templates_router, recruitment_router, careers_router, reporting_router,
               expenses_router, loans_router, assets_router, helpdesk_router, performance_router, training_router,
               offboarding_router, reports_router):
