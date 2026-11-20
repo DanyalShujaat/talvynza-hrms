@@ -164,7 +164,7 @@ export function TaliAssistant() {
       <span className="tali-pet-stage" aria-hidden="true"><Suspense fallback={<span className="tali-loading">✦</span>}><TaliPet active={open || hovered} pointer={pointer} motion={motion} pose={pose} /></Suspense></span>
       {pose === 'sleep' && <span className="tali-dream" aria-hidden="true">z<span>z</span><span>z</span></span>}
       <span className="tali-pet-ground" aria-hidden="true" />
-      <span className="tali-presence" aria-hidden="true"><span className={`tali-online${status?.ready ? ' tali-online-ready' : ''}`} /></span>
+      <span className="tali-tag" aria-hidden="true">Office Tali</span>
     </button>
   </div>
 }
