@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowRight, RefreshCw, Send, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Footprints, RefreshCw, Send, Sparkles, X } from 'lucide-react'
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent, type PointerEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, errorMessage } from '@/lib/api'
+import type { TaliPose } from './TaliPet'
 import './tali.css'
 
 const TaliPet = lazy(() => import('./TaliPet').then(module => ({ default: module.TaliPet })))
@@ -13,11 +14,18 @@ type Message = { id: number; from: 'tali' | 'you'; text: string; link?: LinkInfo
 type ChatResponse = { reply: string; link: LinkInfo | null; proposal: Proposal | null }
 type AIStatus = { ready: boolean; provider: 'ollama' | 'groq'; message: string }
 
-const welcome: Message = { id: 0, from: 'tali', text: "Hi, I'm Tali! Ask me about your tasks or leave, or tell me about a task you'd like to create or move." }
+const welcome: Message = { id: 0, from: 'tali', text: "Hi, I'm Tali! I can help with your tasks and leave balance, find a page, or suggest a task to create or move." }
 const topics = [
   { label: 'My tasks', question: 'What tasks do I have?' },
   { label: 'Leave balance', question: 'What is my leave balance?' },
   { label: 'Create a task', question: 'Help me create a task' },
+]
+const moves: TaliPose[] = ['walk', 'tired', 'sleep', 'slip']
+const idleSequence: { pose: TaliPose; duration: number }[] = [
+  { pose: 'idle', duration: 7000 }, { pose: 'walk', duration: 3600 },
+  { pose: 'idle', duration: 5500 }, { pose: 'tired', duration: 3000 },
+  { pose: 'sleep', duration: 5400 }, { pose: 'idle', duration: 5500 },
+  { pose: 'slip', duration: 5000 }, { pose: 'idle', duration: 6200 },
 ]
 
 export function TaliAssistant() {
@@ -29,7 +37,11 @@ export function TaliAssistant() {
   const [status, setStatus] = useState<AIStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [motion, setMotion] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [pose, setPose] = useState<TaliPose>('idle')
+  const [moveIndex, setMoveIndex] = useState(0)
+  const interacting = open || hovered
   const pointer = useRef({ x: 0, y: 0 })
+  const moveTimer = useRef<number | undefined>(undefined)
   const nextId = useRef(1)
   const input = useRef<HTMLInputElement>(null)
   const end = useRef<HTMLDivElement>(null)
@@ -46,6 +58,21 @@ export function TaliAssistant() {
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
+  useEffect(() => {
+    window.clearTimeout(moveTimer.current)
+    if (!motion || interacting) { setPose('idle'); return }
+    let index = 0
+    let timer: number
+    const advance = () => {
+      const next = idleSequence[index]
+      setPose(next.pose)
+      index = (index + 1) % idleSequence.length
+      timer = window.setTimeout(advance, next.duration)
+    }
+    advance()
+    return () => window.clearTimeout(timer)
+  }, [motion, interacting])
+  useEffect(() => () => window.clearTimeout(moveTimer.current), [])
   useEffect(() => { if (open) input.current?.focus() }, [open])
   useEffect(() => { if (open && end.current?.parentElement) end.current.parentElement.scrollTop = end.current.parentElement.scrollHeight }, [messages, open])
   useEffect(() => {
@@ -91,6 +118,14 @@ export function TaliAssistant() {
   const cancel = (id: number) => setMessages(previous => previous.map(item => item.id === id
     ? { ...item, text: "Okay, I won't make that change.", proposal: null } : item))
   const submit = (event: FormEvent) => { event.preventDefault(); void ask(draft) }
+  const playMove = () => {
+    if (!motion) return
+    const next = moves[moveIndex]
+    setPose(next)
+    setMoveIndex((moveIndex + 1) % moves.length)
+    window.clearTimeout(moveTimer.current)
+    moveTimer.current = window.setTimeout(() => setPose('idle'), next === 'slip' ? 5200 : 4600)
+  }
   const trackPointer = (event: PointerEvent<HTMLButtonElement>) => {
     const box = event.currentTarget.getBoundingClientRect()
     pointer.current.x = Math.max(-1, Math.min(1, (event.clientX - box.left - box.width / 2) / (box.width / 2)))
@@ -102,6 +137,7 @@ export function TaliAssistant() {
       <header className="tali-panel-header">
         <span className="tali-panel-mark" aria-hidden="true">✦</span>
         <span className="tali-panel-heading"><strong>Talk to Tali</strong><small>{status?.provider === 'groq' ? 'Hosted AI' : 'Local AI'}{status?.ready ? ' · ready' : ''}</small></span>
+        <button className="tali-play" type="button" onClick={playMove} disabled={!motion} aria-label={`Show Tali ${moves[moveIndex]}`} title={`Show Tali ${moves[moveIndex]}`}><Footprints size={16} /></button>
         <button className="tali-close" type="button" onClick={() => setOpen(false)} aria-label="Close Tali"><X size={17} /></button>
       </header>
       <div className="tali-status" role="status"><span className={status?.ready ? 'tali-status-dot tali-status-ready' : 'tali-status-dot'} />{status?.message ?? 'Checking the local AI...'}{status && !status.ready && <button type="button" onClick={() => void checkStatus()} aria-label="Check AI again"><RefreshCw size={13} /></button>}</div>
@@ -123,11 +159,12 @@ export function TaliAssistant() {
       </form>
       <p className="tali-disclosure"><Sparkles size={11} /> {status?.provider === 'groq' ? 'Limited context is sent to Groq.' : 'Conversation stays on this computer.'} Changes need confirmation.</p>
     </section>}
-    <button type="button" className={`tali-pet-button${open ? ' tali-pet-open' : ''}`} onClick={() => setOpen(previous => !previous)} onPointerMove={trackPointer} onPointerEnter={() => setHovered(true)} onPointerLeave={() => { setHovered(false); pointer.current.x = 0; pointer.current.y = 0 }} aria-label={open ? 'Close Tali assistant' : 'Open Tali assistant'} aria-expanded={open} title="Meet Tali">
+    <button type="button" className={`tali-pet-button${open ? ' tali-pet-open' : ''}`} data-tali-pose={pose} onClick={() => setOpen(previous => !previous)} onPointerMove={trackPointer} onPointerEnter={() => setHovered(true)} onPointerLeave={() => { setHovered(false); pointer.current.x = 0; pointer.current.y = 0 }} aria-label={open ? 'Close Tali assistant' : 'Open Tali assistant'} aria-expanded={open} title="Meet Tali">
       {!open && <span className="tali-hello">Need a hand?</span>}
-      <span className="tali-pet-stage" aria-hidden="true"><Suspense fallback={<span className="tali-loading">✦</span>}><TaliPet active={open || hovered} pointer={pointer} motion={motion} /></Suspense></span>
+      <span className="tali-pet-stage" aria-hidden="true"><Suspense fallback={<span className="tali-loading">✦</span>}><TaliPet active={open || hovered} pointer={pointer} motion={motion} pose={pose} /></Suspense></span>
+      {pose === 'sleep' && <span className="tali-dream" aria-hidden="true">z<span>z</span><span>z</span></span>}
       <span className="tali-pet-ground" aria-hidden="true" />
-      <span className="tali-pet-name">Tali <span className={`tali-online${status?.ready ? ' tali-online-ready' : ''}`} /></span>
+      <span className="tali-presence" aria-hidden="true"><span className={`tali-online${status?.ready ? ' tali-online-ready' : ''}`} /></span>
     </button>
   </div>
 }

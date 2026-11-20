@@ -1,12 +1,16 @@
 .tali-root{position:fixed;right:18px;bottom:10px;z-index:35;font-family:inherit;pointer-events:none}
 .tali-root button,.tali-root input{font:inherit}
-.tali-pet-button{position:relative;display:block;width:100px;height:130px;margin-left:auto;border:0;background:transparent;cursor:pointer;pointer-events:auto;filter:drop-shadow(0 8px 11px rgba(5,47,79,.15));transition:transform .25s ease}
+.tali-pet-button{position:relative;display:block;width:104px;height:135px;margin-left:auto;border:0;background:transparent;cursor:pointer;pointer-events:auto;filter:drop-shadow(0 8px 11px rgba(5,47,79,.18));transition:transform .25s ease}
 .tali-pet-button:hover{transform:translateY(-5px)}
 .tali-pet-button:focus-visible,.tali-close:focus-visible,.tali-compose button:focus-visible,.tali-topics button:focus-visible{outline:3px solid #20b7c1;outline-offset:2px}
 .tali-pet-stage{position:absolute;inset:0 0 13px;z-index:1;display:block;pointer-events:none}
 .tali-pet-stage canvas{display:block}
+.tali-dream{position:absolute;z-index:2;right:9px;top:14px;color:#1477b3;font-size:15px;font-weight:900;line-height:1;transform:rotate(-12deg);animation:tali-drift 2.3s ease-in-out infinite}
+.tali-dream span:first-child{position:relative;top:-9px;margin-left:1px;font-size:12px}
+.tali-dream span:last-child{position:relative;top:-18px;margin-left:1px;font-size:9px}
+@keyframes tali-drift{0%,100%{transform:translateY(1px) rotate(-12deg);opacity:.6}50%{transform:translateY(-5px) rotate(-12deg);opacity:1}}
 .tali-pet-ground{position:absolute;left:14px;right:12px;bottom:13px;height:15px;border-radius:50%;background:radial-gradient(ellipse,rgba(7,83,126,.34),rgba(7,83,126,0) 73%);filter:blur(4px)}
-.tali-pet-name{position:absolute;z-index:2;right:5px;bottom:7px;display:flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid rgba(115,210,225,.65);border-radius:99px;background:#fff;color:#07577e;font-size:11px;font-weight:800;box-shadow:0 3px 9px rgba(5,47,79,.12)}
+.tali-presence{position:absolute;z-index:2;right:4px;bottom:11px;display:grid;place-items:center;width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#e2e8f0;box-shadow:0 2px 6px rgba(5,47,79,.2)}
 .tali-online{height:6px;width:6px;border-radius:50%;background:#94a3b8;box-shadow:0 0 0 2px #e2e8f0}
 .tali-online-ready{background:#10b981;box-shadow:0 0 0 2px #d7fbe9}
 .tali-hello{position:absolute;z-index:3;right:82px;top:3px;white-space:nowrap;border:1px solid #c5e5ec;border-radius:13px 13px 4px 13px;background:#fff;padding:7px 10px;color:#07577e;font-size:11px;font-weight:700;box-shadow:0 6px 19px rgba(5,47,79,.13);opacity:0;transform:translateX(4px);transition:opacity .2s ease,transform .2s ease}
@@ -25,6 +29,9 @@
 .tali-status button{display:grid;place-items:center;margin-left:auto;border:0;background:transparent;color:#1268b7;cursor:pointer}
 .tali-close{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:9px;background:transparent;color:#526c7d;cursor:pointer}
 .tali-close:hover{background:#dfeef3;color:#0c2e48}
+.tali-play{display:grid;place-items:center;width:30px;height:30px;border:1px solid #c9e2e9;border-radius:9px;background:#fff;color:#1268b7;cursor:pointer}
+.tali-play:hover{background:#e6f7fa}
+.tali-play:disabled{opacity:.45;cursor:not-allowed}
 .tali-messages{flex:1;overflow-y:auto;padding:17px 15px 12px}
 .tali-message{display:flex;align-items:flex-end;gap:7px;margin-bottom:15px}
 .tali-message-you{justify-content:flex-end}
@@ -52,5 +59,5 @@
 .tali-compose button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:9px;background:#1268b7;color:#fff;cursor:pointer}
 .tali-compose button:disabled{opacity:.45;cursor:not-allowed}
 .tali-disclosure{display:flex;align-items:center;justify-content:center;gap:4px;margin:7px 0 9px;color:#668497;font-size:9px;text-align:center}
-@media(max-width:640px){.tali-root{right:6px;bottom:3px}.tali-panel{height:min(470px,calc(100dvh - 140px))}.tali-pet-button{width:86px;height:112px}.tali-hello{right:72px}}
-@media(prefers-reduced-motion:reduce){.tali-pet-button{transition:none}.tali-pet-button:hover{transform:none}}
+@media(max-width:640px){.tali-root{right:6px;bottom:3px}.tali-panel{height:min(470px,calc(100dvh - 140px))}.tali-pet-button{width:90px;height:117px}.tali-hello{right:72px}}
+@media(prefers-reduced-motion:reduce){.tali-pet-button{transition:none}.tali-pet-button:hover{transform:none}.tali-dream{animation:none}}
