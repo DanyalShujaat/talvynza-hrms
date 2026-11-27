@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
-from sqlalchemy import Boolean, Date, ForeignKey, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, TenantScoped, TimestampMixin
@@ -19,6 +19,8 @@ class Branch(Base, IdMixin, TimestampMixin, TenantScoped):
     city: Mapped[str | None] = mapped_column(String(80), nullable=True)
     address: Mapped[str | None] = mapped_column(String(300), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    premises: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 

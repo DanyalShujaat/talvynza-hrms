@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -44,11 +45,24 @@ class BranchIn(BaseModel):
     city: str | None = Field(default=None, max_length=80)
     address: str | None = Field(default=None, max_length=300)
     phone: str | None = Field(default=None, max_length=40)
+    email: EmailStr | None = None
     is_active: bool = True
+
+
+class PremiseIn(BaseModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80)]
+    latitude: float = Field(ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(ge=-180, le=180, allow_inf_nan=False)
+    radius_m: int = Field(ge=10, le=10000)
+
+
+class PremisesIn(BaseModel):
+    premises: list[PremiseIn] = Field(max_length=20)
 
 
 def _branch(b: Branch, counts: dict) -> dict:
     return {"id": b.id, "name": b.name, "code": b.code, "city": b.city, "address": b.address, "phone": b.phone,
+            "email": b.email, "created_at": b.created_at, "premise_count": len(b.premises),
             "is_active": b.is_active, "employee_count": counts.get(b.id, 0)}
 
 
@@ -76,12 +90,35 @@ def update_branch(branch_id: uuid.UUID, body: BranchIn, ctx: AuthContext = Depen
     if b is None:
         raise NotFound("Branch not found")
     _unique(db, Branch, body.name, exclude=b.id)
-    for k, v in body.model_dump().items():
+    for k, v in body.model_dump(exclude_unset=True).items():
         setattr(b, k, v)
     tenancy.record_audit(db, tenant_id=ctx.tenant.id, actor=ctx.identity.id, action="branch.updated",
                          entity_type="branch", entity_id=b.id, ip=ctx.ip)
     db.commit()
     return _branch(b, _count(db, Employee.branch_id))
+
+
+@router.get("/branches/{branch_id}/premises")
+def get_premises(branch_id: uuid.UUID, ctx: AuthContext = Depends(manage), db: Session = Depends(get_db)):
+    branch = db.get(Branch, branch_id)
+    if branch is None:
+        raise NotFound("Branch not found")
+    return {"premises": branch.premises}
+
+
+@router.put("/branches/{branch_id}/premises")
+def update_premises(branch_id: uuid.UUID, body: PremisesIn, ctx: AuthContext = Depends(manage),
+                    db: Session = Depends(get_db)):
+    branch = db.get(Branch, branch_id)
+    if branch is None:
+        raise NotFound("Branch not found")
+    if len({p.name.casefold() for p in body.premises}) != len(body.premises):
+        raise ValidationFailed("Give each premise a different name")
+    branch.premises = [p.model_dump() for p in body.premises]
+    tenancy.record_audit(db, tenant_id=ctx.tenant.id, actor=ctx.identity.id, action="branch.premises_updated",
+                         entity_type="branch", entity_id=branch.id, details={"count": len(branch.premises)}, ip=ctx.ip)
+    db.commit()
+    return {"premises": branch.premises}
 
 
 @router.delete("/branches/{branch_id}", status_code=204)
@@ -137,6 +174,8 @@ def list_departments(ctx: AuthContext = Depends(read), db: Session = Depends(get
 
 @router.post("/departments", status_code=201)
 def create_department(body: DepartmentIn, ctx: AuthContext = Depends(manage), db: Session = Depends(get_db)):
+    if db.scalar(select(Branch.id).where(Branch.is_active.is_(True)).limit(1)) is None:
+        raise Conflict("Add an active branch before creating a department", code="branch_required")
     _unique(db, Department, body.name)
     if body.parent_id and db.get(Department, body.parent_id) is None:
         raise ValidationFailed("Unknown parent department")

@@ -1,6 +1,6 @@
 [project]
 name = "talvynza-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "TALVYNZA HRMS API (FastAPI modular monolith)"
 requires-python = ">=3.12"
 dependencies = [

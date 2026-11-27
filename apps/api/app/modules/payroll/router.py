@@ -287,9 +287,20 @@ def my_payslips(ctx: AuthContext = Depends(require("payslip.read_own")), db: Ses
     me = emp_service.current_employee(db, ctx.membership.id)
     if me is None:
         return []
+    return _published_payslips(db, me.id)
+
+
+@router.get("/employees/{employee_id}/payslips")
+def employee_payslips(employee_id: uuid.UUID, ctx: AuthContext = Depends(require("payroll.read")),
+                      db: Session = Depends(get_db)):
+    emp_service.get_employee(db, employee_id)
+    return _published_payslips(db, employee_id)
+
+
+def _published_payslips(db: Session, employee_id: uuid.UUID) -> list[dict]:
     rows = db.execute(select(PayrollEntry, PayrollRun).join(PayrollRun, PayrollRun.id == PayrollEntry.run_id).where(
-        PayrollEntry.employee_id == me.id, PayrollRun.status == "finalized").order_by(PayrollRun.period_start.desc()))
-    return [{"entry_id": e.id, "period_start": r.period_start, "period_end": r.period_end, "gross": e.gross,
+        PayrollEntry.employee_id == employee_id, PayrollRun.status == "finalized").order_by(PayrollRun.period_start.desc()))
+    return [{"entry_id": e.id, "run_id": r.id, "period_start": r.period_start, "period_end": r.period_end, "gross": e.gross,
              "deductions": e.deductions, "income_tax": e.income_tax, "net": e.net, "currency": r.currency}
             for e, r in rows]
 

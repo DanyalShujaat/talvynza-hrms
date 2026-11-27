@@ -135,6 +135,7 @@ def submit(category_id: uuid.UUID = Form(...), amount: Decimal = Form(..., gt=0,
 
 @router.get("")
 def list_claims(scope: str = Query("mine", pattern="^(mine|team|all)$"), status: str | None = None,
+                employee_id: uuid.UUID | None = None,
                 ctx: AuthContext = Depends(get_tenant_ctx), db: Session = Depends(get_db)):
     me = me_of(db, ctx)
     stmt = select(ExpenseClaim).order_by(ExpenseClaim.created_at.desc()).limit(300)
@@ -149,6 +150,8 @@ def list_claims(scope: str = Query("mine", pattern="^(mine|team|all)$"), status:
         stmt = stmt.where(ExpenseClaim.employee_id == me.id)
     if status:
         stmt = stmt.where(ExpenseClaim.status == status)
+    if employee_id:
+        stmt = stmt.where(ExpenseClaim.employee_id == employee_id)
     rows = db.scalars(stmt).all()
     cats = {c.id: c.name for c in db.scalars(select(ExpenseCategory))}
     return [_claim(c, emp_map(db, {r.employee_id for r in rows}), cats) for c in rows]

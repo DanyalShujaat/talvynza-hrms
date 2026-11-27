@@ -1,3 +1,4 @@
+import { useViewTab } from '@/lib/view-state'
 import { Plus, Target, Trash2 } from 'lucide-react'
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -106,7 +107,7 @@ function MyReviews() {
 }
 
 export function MyPerformancePage() {
-  const [tab, setTab] = React.useState<'goals' | 'reviews'>('goals')
+  const [tab, setTab] = useViewTab(['goals', 'reviews'] as const, 'goals')
   const [open, setOpen] = React.useState(false)
   return (
     <>
@@ -178,7 +179,7 @@ export function PerformancePage() {
   if (team) tabs.push({ id: 'team', label: 'Reviews I owe' })
   if (manage) tabs.push({ id: 'all', label: 'All reviews' }, { id: 'cycles', label: 'Review cycles' })
   tabs.push({ id: 'goals', label: manage ? 'All goals' : 'Team goals' })
-  const [tab, setTab] = React.useState<T>(tabs[0].id)
+  const [tab, setTab] = useViewTab(tabs.map(item => item.id), tabs[0].id)
   const [open, setOpen] = React.useState(false)
   return (
     <>

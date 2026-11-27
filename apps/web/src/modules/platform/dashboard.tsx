@@ -4,10 +4,14 @@ import type { LucideIcon } from 'lucide-react'
 import * as React from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader, CardTitle, EmptyState, ErrorState, Skeleton } from '@/components/ui/card'
 import { Progress, StatTile, StatusText } from '@/components/ui/extras'
+import { ApiError, errorMessage } from '@/lib/api'
 import { hhmm, timeOf, useGet, useSend } from '@/lib/hooks'
+import { readLocation, type PunchLocation } from '@/lib/location'
+import type { AttendanceChannel } from '@/lib/attendance'
 import { useMe } from '@/lib/queries'
 import { cn, formatDate } from '@/lib/utils'
 
@@ -21,7 +25,7 @@ export interface Stats {
   approvals: { leave: number; attendance: number; expenses: number; loans: number; tickets: number }
   alerts: { type: string; employee: string; date: string; employee_id: string }[]
 }
-interface Today { work_date: string; state: 'in' | 'out'; summary: { status: string; first_in: string | null; last_out: string | null; worked_minutes: number; late_minutes: number } }
+interface Today { work_date: string; state: 'in' | 'out'; channels: Record<AttendanceChannel, boolean>; location_required: boolean; biometric_ready: boolean; can_punch: boolean; summary: { status: string; first_in: string | null; last_out: string | null; worked_minutes: number; late_minutes: number } }
 
 export const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening' }
 
@@ -29,12 +33,34 @@ export const greeting = () => { const h = new Date().getHours(); return h < 12 ?
 export function CheckInCard() {
   const qc = useQueryClient()
   const q = useGet<Today>('/attendance/today')
+  const mayRecord = useMe().data?.permissions.includes('attendance.record_own')
   const [now, setNow] = React.useState(new Date())
+  const [locating, setLocating] = React.useState(false)
   React.useEffect(() => { const t = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(t) }, [])
   const done = () => qc.invalidateQueries({ predicate: (x) => ['/attendance', '/dashboard'].some((p) => String(x.queryKey[0]).startsWith(p)) })
-  const checkIn = useSend('POST', '/attendance/check-in', { success: 'Checked in', onSuccess: done })
-  const checkOut = useSend('POST', '/attendance/check-out', { success: 'Checked out', onSuccess: done })
   const d = q.data
+  const [channel, setChannel] = React.useState<'web' | 'mobile'>('web')
+  const checkingIn = d?.state !== 'in'
+  const web = !!d?.channels.web && !d.location_required
+  const mobile = !!d?.channels.mobile
+  const selected = web && (!mobile || channel === 'web') ? 'web' : 'mobile'
+  const action = useSend<{ channel: 'web' | 'mobile'; location?: PunchLocation }>(
+    'POST', body => `/attendance${body.channel === 'mobile' ? '/mobile' : ''}/check-${checkingIn ? 'in' : 'out'}`,
+    { success: checkingIn ? 'Checked in' : 'Checked out', onSuccess: done },
+  )
+  const punch = async () => {
+    if (!d || !mayRecord || !(web || mobile)) return
+    const needsLocation = selected === 'mobile' && d.location_required
+    setLocating(needsLocation)
+    try {
+      const location = needsLocation ? await readLocation() : undefined
+      action.mutate({ channel: selected, location }, { onError: () => { void q.refetch() } })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not get your location.')
+    } finally {
+      setLocating(false)
+    }
+  }
   return (
     <Card className="overflow-hidden">
       <div className="brand-gradient px-5 py-4 text-white">
@@ -42,7 +68,9 @@ export function CheckInCard() {
         <p className="font-display text-3xl font-extrabold tabular-nums">{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
       </div>
       <CardBody>
-        {q.isError ? <p className="text-sm text-muted">Attendance is available once your account is linked to an employee record.</p>
+        {q.isError ? (q.error instanceof ApiError && q.error.status === 404
+          ? <p className="text-sm text-muted">Attendance is available once your account is linked to an employee record.</p>
+          : <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />)
           : !d ? <Skeleton className="h-24 w-full" /> : (
             <div className="space-y-4">
               <div className="flex items-center justify-between"><span className="text-sm text-muted">Today</span><StatusText status={d.summary.status} /></div>
@@ -51,9 +79,18 @@ export function CheckInCard() {
                   <div key={k} className="rounded-lg bg-surface-2 px-2 py-2.5"><dt className="text-[11px] uppercase tracking-wide text-muted">{k}</dt><dd className="font-semibold tabular-nums">{v}</dd></div>))}
               </dl>
               {d.summary.late_minutes > 0 && <p className="text-xs font-medium text-warning">Late by {d.summary.late_minutes} minutes</p>}
-              {d.state === 'out'
-                ? <Button size="lg" className="w-full" onClick={() => checkIn.mutate(undefined as never)} loading={checkIn.isPending}><LogIn className="h-4 w-4" />Check in</Button>
-                : <Button size="lg" variant="danger" className="w-full" onClick={() => checkOut.mutate(undefined as never)} loading={checkOut.isPending}><LogOut className="h-4 w-4" />Check out</Button>}
+              {d.location_required && <p className="text-xs text-muted">Your branch uses premises. Web attendance is blocked.</p>}
+              {d.channels.premises && d.biometric_ready && <p className="text-xs text-muted">Use your branch’s biometric device for premises attendance.</p>}
+              {!mayRecord || !(web || mobile) || (!d.can_punch && checkingIn) ? <p className="text-sm text-muted" role="status">Web and mobile punches are unavailable for your employee record.</p> : <>
+                {web && mobile && <div role="group" aria-label="Attendance method" className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={selected === 'web' ? 'soft' : 'outline'} aria-pressed={selected === 'web'} onClick={() => setChannel('web')}>Web</Button>
+                  <Button size="sm" variant={selected === 'mobile' ? 'soft' : 'outline'} aria-pressed={selected === 'mobile'} onClick={() => setChannel('mobile')}>Mobile</Button>
+                </div>}
+                <p className="text-xs text-muted">{selected === 'mobile' && d.location_required ? 'Mobile punch requires your location inside the branch perimeter.' : 'Punch from anywhere without sharing your location.'}</p>
+                <Button size="lg" variant={checkingIn ? 'primary' : 'danger'} className="w-full" onClick={punch} loading={locating || action.isPending}>
+                  {d.state === 'out' ? <><LogIn className="h-4 w-4" />Check in</> : <><LogOut className="h-4 w-4" />Check out</>}
+                </Button>
+              </>}
             </div>)}
       </CardBody>
     </Card>
@@ -62,8 +99,8 @@ export function CheckInCard() {
 
 function Approvals({ a }: { a: Stats['approvals'] }) {
   const rows: [number, string, string, LucideIcon][] = [
-    [a.leave, 'Leave requests', '/leave', CalendarDays], [a.attendance, 'Attendance corrections', '/attendance', CalendarClock],
-    [a.expenses, 'Expense claims', '/expenses', ReceiptText], [a.loans, 'Loan requests', '/loans', HandCoins], [a.tickets, 'Open help desk tickets', '/helpdesk', LifeBuoy],
+    [a.leave, 'Leave requests', '/inbox?type=Leave', CalendarDays], [a.attendance, 'Attendance corrections', '/inbox?type=Attendance', CalendarClock],
+    [a.expenses, 'Expense claims', '/inbox?type=Expense', ReceiptText], [a.loans, 'Loan requests', '/inbox?type=Loan', HandCoins], [a.tickets, 'Open help desk tickets', '/inbox?type=HR+ticket', LifeBuoy],
   ]
   const open = rows.filter(([n]) => n > 0)
   return (
@@ -91,6 +128,8 @@ export function DashboardPage() {
   const head = useGet<Headcount>('/reports/headcount', undefined, perms.has('reports.view'))
   const org = q.data?.organization
   if (!me?.active_organization) return null
+  const showInbox = ['leave.approve', 'attendance.approve', 'expenses.approve', 'expenses.finance_approve', 'loans.manage', 'helpdesk.manage'].some(permission => perms.has(permission))
+  const showProfiles = perms.has('employees.read') || perms.has('employees.read_team')
   const first = me.identity.full_name.split(' ')[0]
   const chart = (org?.attendance_chart ?? []).map((c) => ({ ...c, day: new Date(c.date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }) }))
   const maxDept = Math.max(1, ...(head.data?.by_department ?? []).map((d) => d.count))
@@ -104,7 +143,7 @@ export function DashboardPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {perms.has('employees.manage') && <Button asChild variant="outline"><Link to="/employees?tab=add"><UserPlus className="h-4 w-4" />Add employee</Link></Button>}
-          {perms.has('payroll.process') && <Button asChild><Link to="/payroll"><Wallet className="h-4 w-4" />Run payroll</Link></Button>}
+          {perms.has('payroll.process') && perms.has('payroll.read') && <Button asChild><Link to="/payroll?tab=runs"><Wallet className="h-4 w-4" />Run payroll</Link></Button>}
         </div>
       </div>
 
@@ -148,13 +187,13 @@ export function DashboardPage() {
           </Card>
         )}
         <div className={cn('space-y-6', !org && 'xl:col-span-3 xl:grid xl:grid-cols-2 xl:gap-6 xl:space-y-0')}>
-          {q.data && <Approvals a={q.data.approvals} />}
-          {!!q.data?.alerts.length && (
+          {q.data && showInbox && <Approvals a={q.data.approvals} />}
+          {showProfiles && !!q.data?.alerts.length && (
             <Card>
               <CardHeader><CardTitle>Coming up in 30 days</CardTitle></CardHeader>
               <ul className="divide-y divide-border">
                 {q.data.alerts.slice(0, 6).map((a, i) => (
-                  <li key={i}><Link to={`/employees/${a.employee_id}`} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-surface-2/60">
+                  <li key={i}><Link to={`/employees/${a.employee_id}?tab=official`} state={{ profileBack: { to: '/', label: 'Dashboard' } }} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-surface-2/60">
                     <FileWarning className="h-4 w-4 shrink-0 text-warning" aria-hidden />
                     <span className="min-w-0 flex-1"><span className="block truncate font-medium">{a.employee}</span><span className="text-xs text-muted">{a.type === 'contract_expiry' ? 'Contract ends' : 'Probation ends'} {formatDate(a.date, { dateStyle: 'medium' })}</span></span>
                   </Link></li>))}
@@ -163,23 +202,23 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {org && (
+      {org && (perms.has('reports.view') || perms.has('org.manage')) && (
         <div className="grid gap-6 xl:grid-cols-3">
-          <Card className="xl:col-span-2">
+          {perms.has('reports.view') && <Card className="xl:col-span-2">
             <CardHeader><CardTitle>Headcount by department</CardTitle><Link to="/reports" className="text-[13px] font-medium text-primary hover:underline">All reports</Link></CardHeader>
             <CardBody className="space-y-3">
-              {!head.data ? <Skeleton className="h-28 w-full" /> : head.data.by_department.length === 0 ? <p className="text-sm text-muted">No employees yet.</p>
+              {head.isError ? <ErrorState message="Headcount could not be loaded." onRetry={() => head.refetch()} /> : !head.data ? <Skeleton className="h-28 w-full" /> : head.data.by_department.length === 0 ? <p className="text-sm text-muted">No employees yet.</p>
                 : head.data.by_department.slice(0, 7).map((d) => (
                   <div key={d.label} className="flex items-center gap-3 text-sm"><span className="w-40 truncate">{d.label}</span><Progress value={(d.count / maxDept) * 100} className="flex-1" /><span className="w-8 text-right font-semibold tabular-nums">{d.count}</span></div>))}
             </CardBody>
-          </Card>
-          <Card>
+          </Card>}
+          {perms.has('org.manage') && <Card>
             <CardHeader><CardTitle>Organization</CardTitle></CardHeader>
             <ul className="divide-y divide-border text-sm">
               {[['Departments', org.departments, '/departments'], ['Designations', org.designations, '/departments'], ['Branches', org.branches, '/branches']].map(([l, n, to]) => (
                 <li key={l as string}><Link to={to as string} className="flex items-center justify-between px-5 py-3 hover:bg-surface-2/60"><span className="text-muted">{l}</span><span className="font-display text-lg font-bold">{n}</span></Link></li>))}
             </ul>
-          </Card>
+          </Card>}
         </div>
       )}
     </div>

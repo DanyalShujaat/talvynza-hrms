@@ -45,12 +45,16 @@ def get_policy(db: Session, tenant_id: uuid.UUID) -> AttendancePolicy:
     return pol
 
 
-def shift_for(db: Session, policy: AttendancePolicy, employee_id: uuid.UUID,
-              on: date) -> tuple[engine.ShiftSpec, uuid.UUID | None]:
-    a = db.scalar(select(ShiftAssignment).where(
+def current_shift_assignment(db: Session, employee_id: uuid.UUID, on: date) -> ShiftAssignment | None:
+    return db.scalar(select(ShiftAssignment).where(
         ShiftAssignment.employee_id == employee_id, ShiftAssignment.effective_from <= on).where(
         (ShiftAssignment.effective_to.is_(None)) | (ShiftAssignment.effective_to >= on)
-    ).order_by(ShiftAssignment.effective_from.desc()))
+    ).order_by(ShiftAssignment.effective_from.desc()).limit(1))
+
+
+def shift_for(db: Session, policy: AttendancePolicy, employee_id: uuid.UUID,
+              on: date) -> tuple[engine.ShiftSpec, uuid.UUID | None]:
+    a = current_shift_assignment(db, employee_id, on)
     if a is not None:
         s = db.get(Shift, a.shift_id)
         if s is not None:
@@ -82,7 +86,7 @@ def recompute(db: Session, tenant: Tenant, emp: Employee, work_date: date) -> At
     tz = tz_of(tenant)
     policy = get_policy(db, tenant.id)
     spec, shift_id = shift_for(db, policy, emp.id, work_date)
-    lo, hi = engine.collection_window(work_date, spec, tz)
+    lo, hi = work_date_window(db, policy, emp.id, work_date, tz)
     raw = db.scalars(select(AttendanceEvent).where(
         AttendanceEvent.employee_id == emp.id, AttendanceEvent.occurred_at >= lo, AttendanceEvent.occurred_at < hi))
     events = [(e.occurred_at, e.kind) for e in raw]
@@ -104,17 +108,29 @@ def recompute(db: Session, tenant: Tenant, emp: Employee, work_date: date) -> At
     return row
 
 
+def work_date_start(db: Session, policy: AttendancePolicy, employee_id: uuid.UUID, day: date, tz: ZoneInfo) -> datetime:
+    """Keep every punch and give the prior overnight shift its after-midnight window."""
+    midnight = datetime.combine(day, time.min, tzinfo=tz).astimezone(UTC)
+    previous = day - timedelta(days=1)
+    shift, _ = shift_for(db, policy, employee_id, previous)
+    if not shift.overnight:
+        return midnight
+    _, overnight_end = engine.collection_window(previous, shift, tz)
+    next_midnight = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz).astimezone(UTC)
+    return max(midnight, min(overnight_end, next_midnight))
+
+
+def work_date_window(db: Session, policy: AttendancePolicy, employee_id: uuid.UUID,
+                     day: date, tz: ZoneInfo) -> tuple[datetime, datetime]:
+    return (work_date_start(db, policy, employee_id, day, tz),
+            work_date_start(db, policy, employee_id, day + timedelta(days=1), tz))
+
+
 def work_date_for(db: Session, tenant: Tenant, emp: Employee, at: datetime) -> date:
-    """Which work date a punch belongs to. A punch shortly after midnight can belong to yesterday's overnight shift."""
     tz = tz_of(tenant)
     policy = get_policy(db, tenant.id)
     local = at.astimezone(tz).date()
-    for candidate in (local - timedelta(days=1), local):
-        spec, _ = shift_for(db, policy, emp.id, candidate)
-        lo, hi = engine.collection_window(candidate, spec, tz)
-        if spec.overnight and lo <= at < hi:
-            return candidate
-    return local
+    return local - timedelta(days=1) if at < work_date_start(db, policy, emp.id, local, tz) else local
 
 
 def punch(db: Session, tenant: Tenant, emp: Employee, kind: str, at: datetime, *, source: str,
@@ -137,26 +153,25 @@ def open_state(db: Session, tenant: Tenant, emp: Employee, at: datetime) -> str:
     """'in' if the employee is currently clocked in, otherwise 'out'."""
     wd = work_date_for(db, tenant, emp, at)
     policy = get_policy(db, tenant.id)
-    spec, _ = shift_for(db, policy, emp.id, wd)
-    lo, hi = engine.collection_window(wd, spec, tz_of(tenant))
+    lo, hi = work_date_window(db, policy, emp.id, wd, tz_of(tenant))
     evs = db.scalars(select(AttendanceEvent).where(
         AttendanceEvent.employee_id == emp.id, AttendanceEvent.occurred_at >= lo, AttendanceEvent.occurred_at < hi))
     _, dangling = engine.pair_punches([(e.occurred_at, e.kind) for e in evs])
     return "in" if dangling else "out"
 
 
-def check(db: Session, tenant: Tenant, emp: Employee, kind: str, actor: uuid.UUID) -> AttendanceDaily:
+def check(db: Session, tenant: Tenant, emp: Employee, kind: str, actor: uuid.UUID, *, source: str = "web") -> AttendanceDaily:
     now = utcnow().replace(microsecond=0)
     state = open_state(db, tenant, emp, now)
     if kind == "in" and state == "in":
         raise Conflict("You are already checked in", code="already_checked_in")
     if kind == "out" and state == "out":
         raise Conflict("You are not checked in", code="not_checked_in")
-    return punch(db, tenant, emp, kind, now, source="web", actor=actor)
+    return punch(db, tenant, emp, kind, now, source=source, actor=actor)
 
 
 # ------------------------------------------------------------------ import
-def import_punches(db: Session, tenant: Tenant, actor: uuid.UUID, data: bytes) -> dict:
+def import_punches(db: Session, tenant: Tenant, actor: uuid.UUID, data: bytes, *, branch_id: uuid.UUID | None = None) -> dict:
     """CSV columns: employee_code (or bio_id), timestamp (ISO 8601, UTC if no offset), optional kind (in/out).
     Missing kinds alternate in/out per employee per day. Duplicate reads are ignored."""
     try:
@@ -164,50 +179,84 @@ def import_punches(db: Session, tenant: Tenant, actor: uuid.UUID, data: bytes) -
     except UnicodeDecodeError:
         raise ValidationFailed("CSV must be UTF-8 encoded", code="bad_file") from None
     reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames or "timestamp" not in [f.strip().lower() for f in reader.fieldnames]:
+    fields = {f.strip().lower() for f in reader.fieldnames or []}
+    if "timestamp" not in fields:
         raise ValidationFailed("CSV needs a 'timestamp' column", code="bad_file")
+    if branch_id is not None and "bio_id" not in fields:
+        raise ValidationFailed("A biometric export needs a 'bio_id' column", code="bad_file")
+    if branch_id is None and "employee_code" not in fields:
+        raise ValidationFailed("Select the device branch to import biometric IDs", code="branch_required")
     emps = list(db.scalars(select(Employee).where(Employee.deleted_at.is_(None))))
     by_code = {e.employee_code: e for e in emps}
-    by_bio = {e.bio_id: e for e in emps if e.bio_id}
+    by_bio: dict[str, list[Employee]] = {}
+    for emp in emps:
+        if branch_id is not None and emp.branch_id == branch_id and emp.bio_id:
+            by_bio.setdefault(emp.bio_id, []).append(emp)
     imported, skipped, errors = 0, 0, []
     seen: set[tuple[uuid.UUID, datetime, str]] = set()  # rows added in this file are not flushed yet
     touched: set[tuple[uuid.UUID, date]] = set()
     counters: dict[tuple[uuid.UUID, date], int] = {}
+    rows = []
+    implicit_seen: set[tuple[uuid.UUID, datetime]] = set()
     for i, raw in enumerate(reader, start=2):
         row = {k.strip().lower(): (v or "").strip() for k, v in raw.items() if k}
-        emp = by_code.get(row.get("employee_code", "")) or by_bio.get(row.get("bio_id", ""))
+        if branch_id is None:
+            emp = by_code.get(row.get("employee_code", ""))
+        else:
+            matches = by_bio.get(row.get("bio_id", ""), [])
+            if len(matches) > 1:
+                errors.append({"row": i, "error": "biometric ID is shared by multiple employees in this branch"})
+                continue
+            emp = matches[0] if matches else None
         if emp is None:
-            errors.append({"row": i, "error": "unknown employee"})
+            errors.append({"row": i, "error": "unknown biometric ID for this branch" if branch_id else "unknown employee"})
+            continue
+        if branch_id is not None and not emp.premises_attendance_enabled:
+            errors.append({"row": i, "error": "premises attendance is disabled for this employee"})
             continue
         try:
             at = datetime.fromisoformat(row["timestamp"])
         except (KeyError, ValueError):
             errors.append({"row": i, "error": "invalid timestamp"})
             continue
-        at = (at.replace(tzinfo=UTC) if at.tzinfo is None else at.astimezone(UTC)).replace(microsecond=0)
+        if at.tzinfo is None:
+            at = at.replace(tzinfo=tz_of(tenant) if branch_id else UTC)
+        at = at.astimezone(UTC).replace(microsecond=0)
         kind = row.get("kind", "").lower()
-        key = (emp.id, at.astimezone(tz_of(tenant)).date())
-        if kind not in ("in", "out"):
+        if kind and kind not in ("in", "out"):
+            errors.append({"row": i, "error": "kind must be 'in' or 'out'"})
+            continue
+        rows.append((at, i, emp, kind))
+    for at, _, emp, kind in sorted(rows, key=lambda row: (row[0], row[1])):
+        wd = work_date_for(db, tenant, emp, at)
+        key = (emp.id, wd)
+        if not kind:
+            if (emp.id, at) in implicit_seen:
+                skipped += 1
+                continue
+            implicit_seen.add((emp.id, at))
             kind = "in" if counters.get(key, 0) % 2 == 0 else "out"
-        counters[key] = counters.get(key, 0) + 1
+        counters[key] = 1 if kind == "in" else 0
         if (emp.id, at, kind) in seen or db.scalar(select(AttendanceEvent.id).where(
                 AttendanceEvent.employee_id == emp.id, AttendanceEvent.occurred_at == at,
                 AttendanceEvent.kind == kind)):
             skipped += 1
             continue
         seen.add((emp.id, at, kind))
-        db.add(AttendanceEvent(tenant_id=tenant.id, employee_id=emp.id, kind=kind, occurred_at=at, source="import",
+        db.add(AttendanceEvent(tenant_id=tenant.id, employee_id=emp.id, kind=kind, occurred_at=at,
+                               source="biometric" if branch_id else "import",
                                created_by=actor))
-        touched.add((emp.id, work_date_for(db, tenant, emp, at)))
+        touched.add(key)
         imported += 1
     db.flush()
     by_id = {e.id: e for e in emps}
     for emp_id, wd in touched:
         recompute(db, tenant, by_id[emp_id], wd)
     tenancy.record_audit(db, tenant_id=tenant.id, actor=actor, action="attendance.imported", entity_type="attendance",
-                         details={"imported": imported, "duplicates": skipped, "errors": len(errors)})
+                         details={"imported": imported, "duplicates": skipped, "errors": len(errors),
+                                  "branch_id": str(branch_id) if branch_id else None})
     db.commit()
-    return {"imported": imported, "duplicates_ignored": skipped, "errors": errors[:50]}
+    return {"imported": imported, "duplicates_ignored": skipped, "error_count": len(errors), "errors": errors[:50]}
 
 
 # ------------------------------------------------------------------ corrections

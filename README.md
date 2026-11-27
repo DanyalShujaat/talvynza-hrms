@@ -1,94 +1,59 @@
-# TALVYNZA HRMS
+# Talvynza HRMS
 
-Multi-tenant HR management system: employees, attendance, leave, payroll, hiring, notices and tasks, with role-based
-access and a full audit trail. See [PROGRESS.md](PROGRESS.md) for what is built and what is not, and
-[docs/product/known-limitations.md](docs/product/known-limitations.md) for gaps.
+Talvynza brings employee records, attendance, leave, payroll, recruitment, and workplace requests into one workspace. Administrators manage the organization, managers review their teams, and employees use My Space for their own records and requests.
 
-## Layout
-```
-apps/api            FastAPI modular monolith (Python 3.12)
-apps/web            React, TypeScript, Vite, Tailwind SPA (plus Playwright browser tests in apps/web/e2e)
-packages/shared-types   TypeScript API types
-infrastructure/     Dockerfiles and nginx config
-docs/               architecture, database, product docs, API spec
-scripts/            permission-matrix generator, style check
-```
+## Project guide
 
-## Run locally (no Docker, SQLite)
-Two terminals.
+| Guide | What it covers |
+| --- | --- |
+| [System design](docs/architecture/system-design.md) | Application boundaries, data ownership, and the production topology |
+| [Workflow diagrams](docs/product/workflows.md) | Onboarding, attendance, requests, payroll, and offboarding |
+| [Business rules](docs/product/business-rules.md) | Validation rules and lifecycle transitions |
+| [Security and privacy](docs/architecture/security-privacy.md) | Tenant isolation, authentication, permissions, and sensitive data |
+| [Database relationships](docs/database/erd.md) | Key records and their relationships |
+| [API schema](docs/api/openapi.json) | Request and response contracts |
+| [Testing](docs/product/testing.md) | API and browser verification |
+| [Changelog](CHANGELOG.md) | Named releases and changes |
 
-```powershell
-# API  ->  http://127.0.0.1:8000  (docs at /api/docs)
-cd apps/api
-python -m venv .venv ; .\.venv\Scripts\pip install -e ".[dev]"
-$env:TALVYNZA_DATABASE_URL = "sqlite:///./dev.db"; $env:TALVYNZA_LOG_JSON = "false"
-.\.venv\Scripts\alembic upgrade head
-.\.venv\Scripts\uvicorn app.main:app --reload --port 8000
+## Repository layout
 
-# Web  ->  http://localhost:5173
-cd apps/web ; npm install ; npm run dev
-```
+| Path | Contents |
+| --- | --- |
+| `apps/api` | FastAPI, SQLAlchemy, Alembic migrations, and API tests |
+| `apps/web` | React, TypeScript, Vite, and Playwright browser tests |
+| `packages/shared-types` | Shared TypeScript contracts |
+| `infrastructure/docker` | Container build and reverse proxy configuration |
+| `docs` | Architecture, database, product, and API references |
+| `scripts` | Local demo and repository utilities |
 
-With the default `console` email backend, verification and reset links are printed in the API terminal.
+## Run locally
 
-Load fictional demo data (refuses to run in production):
-```powershell
-cd apps/api ; .\.venv\Scripts\python scripts\seed_demo.py     # API must be running
-```
-It creates the organization "Northwind Demo" and prints the owner login.
-
-## Tali's local AI
-
-Tali can answer questions using the signed-in employee's own tasks and leave balances. It can propose creating a
-personal task or changing one of that employee's task statuses; the person must confirm each change. Conversation
-requests stay on your computer when Ollama runs locally. The feature is off by default on other servers.
+Install Python 3.12 and Node.js. From the repository root in PowerShell:
 
 ```powershell
-docker run -d --name talvynza-ollama --restart unless-stopped -p 127.0.0.1:11434:11434 -v talvynza-ollama:/root/.ollama ollama/ollama:latest
-docker exec talvynza-ollama ollama pull qwen3:0.6b
-powershell -ExecutionPolicy Bypass -File scripts/start-demo.ps1
+python -m venv apps/api/.venv
+apps/api/.venv/Scripts/python.exe -m pip install -e "./apps/api[dev]"
+npm --prefix apps/web ci
+apps/api/.venv/Scripts/python.exe scripts/run_demo.py
 ```
 
-If the container already exists, use `docker start talvynza-ollama` instead of `docker run`. Open
-`http://localhost:5180/login` and click Tali in the lower right. The model needs about 1.4 GB of disk space and
-may respond slowly on a CPU. Set `TALVYNZA_AI_ENABLED=true` for another local API process; see
-[.env.example](.env.example) for the model and URL settings.
+Open <http://localhost:5180>. The demo keeps fictional accounts and data in `.local/demo`. Use the same command to reopen the existing demo.
 
-For the hosted API, configure `TALVYNZA_AI_PROVIDER=groq`, `TALVYNZA_AI_ENABLED=true`, and a
-`TALVYNZA_AI_GROQ_API_KEY` secret in Railway. Groq's free tier is rate limited. The assistant sends only the signed-in
-employee's name, recent personal task titles and statuses, leave balances, the current question, and recent chat
-turns. No payroll or other employee records are included. Groq's inference data controls should be reviewed before
-using real employee information.
+For a container-based development stack, copy `.env.example` to `.env`, set the local secrets, and run `docker compose up --build`. The web app listens on port 8080.
 
-## Run with PostgreSQL and Redis (Docker)
-```bash
-cp .env.example .env     # set TALVYNZA_SECRET_KEY and POSTGRES_PASSWORD
-docker compose up --build   # web on http://localhost:8080
-```
-The Docker files have not been run yet. See known limitations.
+## Verify changes
 
-## Deploy on Railway
-
-Create a Railway project from the `master` branch, then add PostgreSQL and Redis services. Deploy two services from this
-repository: the API service uses `infrastructure/docker/api.Dockerfile` and listens on port `8000`; the web service uses
-`infrastructure/docker/web.Dockerfile` and listens on port `80`.
-
-Set `API_UPSTREAM` on the web service to the API service's private Railway hostname and port, for example
-`api.railway.internal:8000`. Set the API service's `TALVYNZA_DATABASE_URL` and `TALVYNZA_REDIS_URL` from the Railway
-PostgreSQL and Redis references. Production also requires a strong `TALVYNZA_SECRET_KEY`, `TALVYNZA_ENVIRONMENT=production`,
-SMTP settings, and matching `TALVYNZA_FRONTEND_URL` and `TALVYNZA_CORS_ORIGINS`. Add a persistent volume mounted at
-`/srv/storage` to the API service for uploaded files. Use `/health` as the API healthcheck and expose the web service's
-port `80` through its Railway domain.
-
-## Tests
 ```powershell
-cd apps/api ; .\.venv\Scripts\pytest -q ; .\.venv\Scripts\ruff check app tests
-cd apps/web ; npm run typecheck ; npm test ; npm run build
-cd apps/web ; npx playwright install chromium ; npm run e2e     # starts its own API and web server
-python scripts/check_style.py                                     # no em dashes
-python scripts/gen_permission_matrix.py                           # regenerates docs/product/permission-matrix.md
+Push-Location apps/api
+.venv/Scripts/python.exe -m pytest -q
+Pop-Location
+npm --prefix apps/web test
+npm --prefix apps/web run build
+npm --prefix apps/web run e2e
 ```
 
-## Configuration
-All settings are `TALVYNZA_*` environment variables, listed in [.env.example](.env.example). Production refuses to start
-with the default secret key or the in-memory email backend. Never commit `.env`.
+Install the Chromium test browser with `npx playwright install chromium` from `apps/web` before the first browser run.
+
+## Production
+
+Production serves the web app through Vercel and the API through Railway. The web app forwards `/api/*` to the API so sessions use the web origin. The Railway API container applies Alembic migrations before starting. Keep production configuration and credentials in the hosting environments. See [system design](docs/architecture/system-design.md#production-and-release) for the release sequence.

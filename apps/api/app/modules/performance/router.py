@@ -62,7 +62,8 @@ def _can_manage_goal(db: Session, ctx: AuthContext, me: Employee | None, employe
 
 
 @router.get("/goals")
-def list_goals(scope: str = Query("mine", pattern="^(mine|team|all)$"), ctx: AuthContext = Depends(get_tenant_ctx),
+def list_goals(scope: str = Query("mine", pattern="^(mine|team|all)$"), employee_id: uuid.UUID | None = None,
+               ctx: AuthContext = Depends(get_tenant_ctx),
                db: Session = Depends(get_db)):
     me = me_of(db, ctx)
     stmt = select(Goal).order_by(Goal.status, Goal.due_date.is_(None), Goal.due_date)
@@ -75,6 +76,8 @@ def list_goals(scope: str = Query("mine", pattern="^(mine|team|all)$"), ctx: Aut
         if me is None:
             return []
         stmt = stmt.where(Goal.employee_id == me.id)
+    if employee_id:
+        stmt = stmt.where(Goal.employee_id == employee_id)
     rows = db.scalars(stmt.limit(500)).all()
     emps = emp_map(db, {g.employee_id for g in rows})
     return [_goal(g, emps) for g in rows]
@@ -203,6 +206,7 @@ def _review(r: Review, emps: dict, cycles: dict, viewer_is_subject: bool) -> dic
 
 @router.get("/reviews")
 def list_reviews(scope: str = Query("mine", pattern="^(mine|team|all)$"), cycle_id: uuid.UUID | None = None,
+                 employee_id: uuid.UUID | None = None,
                  ctx: AuthContext = Depends(get_tenant_ctx), db: Session = Depends(get_db)):
     me = me_of(db, ctx)
     stmt = select(Review).order_by(Review.created_at.desc())
@@ -217,6 +221,8 @@ def list_reviews(scope: str = Query("mine", pattern="^(mine|team|all)$"), cycle_
         stmt = stmt.where(Review.employee_id == me.id)
     if cycle_id:
         stmt = stmt.where(Review.cycle_id == cycle_id)
+    if employee_id:
+        stmt = stmt.where(Review.employee_id == employee_id)
     rows = db.scalars(stmt.limit(500)).all()
     emps = emp_map(db, {r.employee_id for r in rows} | {r.reviewer_id for r in rows})
     cycles = {c.id: c.name for c in db.scalars(select(ReviewCycle))}

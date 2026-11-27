@@ -209,12 +209,16 @@ def test_payslip_privacy_and_publication(signup, new_client):
     col_api = join(owner, new_client, "col@x.test", "employee", name="Col")
     rid, _ = run_and_calc(owner)
     assert pat_api.get(f"{API}/payslips").json() == []  # nothing is visible before finalization
+    profile_payslips = f"{API}/employees/{pat['id']}/payslips"
+    assert owner.get(profile_payslips).json() == []
+    assert pat_api.get(profile_payslips).status_code == 403
     entry = entry_for(owner, rid)[0]
     assert pat_api.get(f"{API}/payslips/{entry['id']}").status_code == 404
     approver.post(f"{API}/payroll/runs/{rid}/approve")
     approver.post(f"{API}/payroll/runs/{rid}/finalize")
     slips = pat_api.get(f"{API}/payslips").json()
     assert len(slips) == 1 and dec(slips[0]["net"]) == Dec("105483.87")
+    assert owner.get(profile_payslips).json() == slips
     slip = pat_api.get(f"{API}/payslips/{entry['id']}").json()
     assert slip["employee"] == "Pat Khan" and slip["earnings"] and "switched off" in slip["statutory_notice"]
     assert col_api.get(f"{API}/payslips/{entry['id']}").status_code == 404  # someone else's payslip

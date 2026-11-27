@@ -5,8 +5,25 @@ from tests.conftest import PASSWORD, last_token
 API = "/api/v1"
 
 
+def configure_employee_setup(api):
+    missing = api.get(f"{API}/employees/setup").json()["missing"]
+    if "branch" in missing:
+        assert api.post(f"{API}/branches", {"name": "Head Office"}).status_code == 201
+    if "department" in missing:
+        assert api.post(f"{API}/departments", {"name": "General"}).status_code == 201
+    if "attendance_policy" in missing:
+        policy = api.get(f"{API}/attendance/policy").json()
+        assert api.put(f"{API}/attendance/policy", policy).status_code == 200
+    if "payroll" in missing:
+        assert api.post(f"{API}/payroll/templates", {"name": "Standard", "basic": "50000"}).status_code == 201
+    branch = next(b for b in api.get(f"{API}/branches").json() if b["is_active"])
+    department = next(d for d in api.get(f"{API}/departments").json() if d["is_active"])
+    return {"branch_id": branch["id"], "department_id": department["id"]}
+
+
 def mkemp(api, **kw):
-    payload = {"first_name": "Ali", "last_name": "Khan", "joining_date": "2026-01-05", **kw}
+    payload = {"first_name": "Ali", "last_name": "Khan", "joining_date": "2026-01-05",
+               **configure_employee_setup(api), **kw}
     r = api.post(f"{API}/employees", payload)
     assert r.status_code == 201, r.text
     return r.json()

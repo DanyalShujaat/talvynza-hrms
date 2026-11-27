@@ -1,6 +1,6 @@
+import { useViewQuery, useViewTab } from '@/lib/view-state'
 import { Paperclip, Plus, ReceiptText } from 'lucide-react'
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, PageHeader } from '@/components/ui/card'
@@ -61,15 +61,15 @@ const amountCell = (c: Claim) => (
 const receiptCell = (c: Claim) => (c.has_receipt ? <a href={`/api/v1/expenses/${c.id}/receipt`} onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-[13px] text-primary hover:underline"><Paperclip className="h-3.5 w-3.5" />Receipt</a> : <span className="text-subtle">None</span>)
 
 export function MyExpensesPage() {
-  const [sp, setSp] = useSearchParams()
-  const [open, setOpen] = React.useState(sp.get('new') === '1')
-  React.useEffect(() => { if (sp.get('new')) setSp({}, { replace: true }) }, [sp, setSp])
+  const [sp, update] = useViewQuery()
+  const [open, setOpen] = React.useState(false)
+  React.useEffect(() => { if (sp.get('new') === '1') { setOpen(true); update({ new: null }) } }, [sp])
   const q = useGet<Claim[]>('/expenses', { scope: 'mine' })
   const cancel = useSend<string>('POST', (id) => `/expenses/${id}/cancel`, { invalidate: ['/expenses'], success: 'Claim cancelled' })
   return (
     <>
       <PageHeader title="My expenses" description="Claims you have submitted and where each one stands." actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" />New claim</Button>} />
-      <Card><DataTable rows={q.data} rowKey={(c) => c.id} query={q} empty="No expense claims yet" emptyHint="Submit a claim with its receipt to be reimbursed." emptyIcon={ReceiptText} cols={[
+      <Card><DataTable rows={q.data} rowKey={(c) => c.id} query={q} empty="No expense claims yet" emptyHint="Submit a claim with its receipt to be reimbursed." emptyIcon={ReceiptText} focusKey={sp.get('record')} cols={[
         { header: 'Date', cell: (c) => formatDate(c.expense_date, { dateStyle: 'medium' }) },
         { header: 'Expense', cell: (c) => <div><p className="font-medium">{c.description}</p><p className="text-xs text-muted">{c.category}{(c.finance_note || c.manager_note) && ` · Note: ${c.finance_note || c.manager_note}`}</p></div> },
         { header: 'Amount', right: true, cell: amountCell },
@@ -138,9 +138,11 @@ export function ExpensesPage() {
   const tabs: { id: T; label: string }[] = []
   if (manager) tabs.push({ id: 'team', label: 'My team' })
   if (finance) tabs.push({ id: 'finance', label: 'Finance queue' }, { id: 'all', label: 'All claims' }, { id: 'categories', label: 'Categories' })
-  const [tab, setTab] = React.useState<T>(finance ? 'finance' : 'team')
+  const [tab, setTab] = useViewTab(tabs.map(item => item.id), finance ? 'finance' : 'team')
+  const [params, update] = useViewQuery()
+  const employeeId = params.get('employee_id')
   const [deciding, setDeciding] = React.useState<Claim | null>(null)
-  const q = useGet<Claim[]>('/expenses', { scope: tab === 'team' ? 'team' : 'all' }, tab !== 'categories')
+  const q = useGet<Claim[]>('/expenses', { scope: tab === 'team' ? 'team' : 'all', employee_id: employeeId || undefined }, tab !== 'categories')
   const managerDecide = useSend<{ id: string; approve: boolean }>('POST', (b) => `/expenses/${b.id}/manager-decision`, { invalidate: ['/expenses', '/dashboard'], success: 'Decision saved' })
   const paid = useSend<string>('POST', (id) => `/expenses/${id}/reimburse`, { invalidate: ['/expenses'], success: 'Marked as reimbursed' })
   const rows = tab === 'finance' ? (q.data ?? []).filter((c) => ['submitted', 'manager_approved', 'approved'].includes(c.status)) : q.data
@@ -162,7 +164,8 @@ export function ExpensesPage() {
     <>
       <PageHeader title="Expenses" description="Review and reimburse expense claims. Claims paid through payroll are settled when the run is finalized." />
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
-      {tab === 'categories' ? <Categories /> : <Card><DataTable rows={rows} rowKey={(c) => c.id} query={q} empty="No claims here" emptyIcon={ReceiptText} cols={cols} /></Card>}
+      {employeeId && tab !== 'categories' && <Button className="mb-4" variant="ghost" onClick={() => update({ employee_id: null, record: null })}>Show all employees’ expenses</Button>}
+      {tab === 'categories' ? <Categories /> : <Card><DataTable rows={rows} rowKey={(c) => c.id} query={q} empty="No claims here" emptyIcon={ReceiptText} focusKey={params.get('record')} cols={cols} /></Card>}
       <FinanceDialog claim={deciding} onClose={() => setDeciding(null)} />
     </>
   )

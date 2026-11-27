@@ -2,7 +2,7 @@ import io
 
 import pytest
 
-from tests.helpers import API, join, mkemp, my_employee_id
+from tests.helpers import API, configure_employee_setup, join, mkemp, my_employee_id
 
 
 def test_owner_gets_an_employee_record_automatically(signup):
@@ -11,11 +11,51 @@ def test_owner_gets_an_employee_record_automatically(signup):
     assert me["full_name"] == "Olivia Owner" and me["has_login"] is True and me["employee_code"] == "1001"
 
 
+def test_employee_setup_gates_department_creation_and_employee_entry(signup):
+    owner = signup()
+    other = signup("other@other.test", "Other Org")
+    other_placement = configure_employee_setup(other)
+    setup_url = f"{API}/employees/setup"
+    payload = {"first_name": "Sara", "last_name": "Khan", "joining_date": "2026-02-01"}
+    assert owner.get(setup_url).json()["missing"] == ["branch", "department", "attendance_policy", "payroll"]
+    assert owner.post(f"{API}/departments", {"name": "Engineering"}).json()["error"]["code"] == "branch_required"
+    inactive = owner.post(f"{API}/branches", {"name": "Closed Office", "is_active": False}).json()
+    assert owner.post(f"{API}/departments", {"name": "Engineering"}).status_code == 409
+    assert owner.post(f"{API}/employees", payload).json()["error"]["code"] == "employee_setup_required"
+    r = _upload(owner, "/employees/import/commit", CSV, skip_invalid="true")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "employee_setup_required"
+
+    policy = owner.get(f"{API}/attendance/policy").json()
+    assert "attendance_policy" in owner.get(setup_url).json()["missing"]
+    assert owner.put(f"{API}/attendance/policy", policy).status_code == 200
+    assert owner.post(f"{API}/payroll/templates", {
+        "name": "Archived", "basic": "50000", "is_active": False,
+    }).status_code == 201
+    assert owner.get(setup_url).json()["missing"] == ["branch", "department", "payroll"]
+
+    placement = configure_employee_setup(owner)
+    assert owner.get(setup_url).json()["missing"] == []
+    assert owner.post(f"{API}/employees", payload).status_code == 422
+    for branch_id in (inactive["id"], other_placement["branch_id"]):
+        r = owner.post(f"{API}/employees", {**payload, **placement, "branch_id": branch_id})
+        assert r.status_code == 422 and r.json()["error"]["details"] == [{"field": "branch_id"}]
+
+    leave_types = owner.get(f"{API}/leave/types").json()
+    for leave_type in leave_types:
+        r = owner.put(f"{API}/leave/types/{leave_type['id']}", {**leave_type, "is_active": False})
+        assert r.status_code == 200, r.text
+    assert owner.get(setup_url).json()["missing"] == ["leave_type"]
+    assert owner.post(f"{API}/employees", {**payload, **placement}).status_code == 409
+    assert owner.put(f"{API}/leave/types/{leave_types[0]['id']}", leave_types[0]).status_code == 200
+    assert owner.post(f"{API}/employees", {**payload, **placement}).status_code == 201
+
+
 def test_create_list_filter_search_and_sort(signup):
     owner = signup()
+    placement = configure_employee_setup(owner)
     dept = owner.post(f"{API}/departments", {"name": "Engineering"}).json()
     mkemp(owner, first_name="Zara", last_name="Ahmed", email="zara@acme.test", department_id=dept["id"])
-    mkemp(owner, first_name="Bilal", last_name="Shah", email="bilal@acme.test")
+    mkemp(owner, first_name="Bilal", last_name="Shah", email="bilal@acme.test", department_id=placement["department_id"])
     names = [e["first_name"] for e in owner.get(f"{API}/employees").json()["items"]]
     assert names == sorted(names)
     assert owner.get(f"{API}/employees", params={"q": "zara"}).json()["total"] == 1
@@ -26,12 +66,13 @@ def test_create_list_filter_search_and_sort(signup):
 
 def test_duplicate_code_and_email_rejected(signup):
     owner = signup()
+    placement = configure_employee_setup(owner)
     mkemp(owner, employee_code="E-1", email="a@acme.test")
     r = owner.post(f"{API}/employees", {"first_name": "B", "last_name": "B", "joining_date": "2026-01-05",
-                                        "employee_code": "E-1"})
+                                        **placement, "employee_code": "E-1"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "duplicate_employee_code"
     r = owner.post(f"{API}/employees", {"first_name": "B", "last_name": "B", "joining_date": "2026-01-05",
-                                        "email": "A@acme.test"})
+                                        **placement, "email": "A@acme.test"})
     assert r.status_code == 409 and r.json()["error"]["code"] == "duplicate_email"
 
 
@@ -78,17 +119,25 @@ def test_lifecycle_transitions_and_audit(signup):
     assert out.json()["status"] == "resigned" and out.json()["exit_date"] == "2026-11-10"
     back = owner.post(f"{API}/employees/{emp['id']}/lifecycle", {"event_type": "rehire", "effective_date": "2026-12-01"})
     assert back.json()["status"] == "active" and back.json()["exit_date"] is None
+    inactive = owner.post(f"{API}/employees/{emp['id']}/lifecycle",
+                          {"event_type": "deactivation", "effective_date": "2026-11-20"})
+    assert inactive.json()["status"] == "inactive" and inactive.json()["exit_date"] == "2026-11-20"
+    assert owner.get(f"{API}/employees", params={"status": "former"}).json()["items"][0]["id"] == emp["id"]
     kinds = [e["event_type"] for e in owner.get(f"{API}/employees/{emp['id']}/history").json()["events"]]
-    assert {"joined", "confirmation", "suspension", "reinstatement", "resignation", "rehire"} <= set(kinds)
+    assert {"joined", "confirmation", "suspension", "reinstatement", "resignation", "rehire", "deactivation"} <= set(kinds)
     actions = {a["action"] for a in owner.get(f"{API}/audit-logs", params={"page_size": 100}).json()["items"]}
     assert {"employee.created", "employee.resignation", "employee.rehire"} <= actions
 
 
 def test_promotion_and_transfer_open_new_assignments(signup):
     owner = signup()
+    configure_employee_setup(owner)
     d1, d2 = (owner.post(f"{API}/departments", {"name": n}).json() for n in ("Sales", "Support"))
     des = owner.post(f"{API}/designations", {"name": "Lead", "department_id": d1["id"]}).json()
+    support_des = owner.post(f"{API}/designations", {"name": "Support Lead", "department_id": d2["id"]}).json()
     emp = mkemp(owner, email="p@x.test", department_id=d1["id"])
+    mismatch = owner.patch(f"{API}/employees/{emp['id']}", {"designation_id": support_des["id"]})
+    assert mismatch.status_code == 422
     owner.post(f"{API}/employees/{emp['id']}/lifecycle", {"event_type": "promotion", "effective_date": "2026-06-01",
                                                           "details": {"designation_id": des["id"]}})
     owner.post(f"{API}/employees/{emp['id']}/lifecycle", {"event_type": "transfer", "effective_date": "2026-07-01",
@@ -96,6 +145,9 @@ def test_promotion_and_transfer_open_new_assignments(signup):
     e = owner.get(f"{API}/employees/{emp['id']}").json()
     assert e["designation"] == "Lead" and e["department"] == "Support"
     assert len(owner.get(f"{API}/employees/{emp['id']}/history").json()["assignments"]) == 3
+    transfer = owner.post(f"{API}/employees/{emp['id']}/lifecycle", {"event_type": "transfer", "effective_date": "2026-08-01",
+                                                                   "details": {"designation_id": support_des["id"]}})
+    assert transfer.status_code == 200 and transfer.json()["designation"] == "Support Lead"
 
 
 # ------------------------------------------------------------------ visibility & field protection
@@ -146,8 +198,9 @@ def test_employees_are_isolated_between_tenants(signup):
     assert b.patch(f"{API}/employees/{ea['id']}", {"first_name": "Pwn"}).status_code == 404
     assert b.get(f"{API}/employees/{ea['id']}/documents").status_code == 404
     assert "Secret" not in str(b.get(f"{API}/employees").json())
+    placement = configure_employee_setup(b)
     assert b.post(f"{API}/employees", {"first_name": "X", "last_name": "Y", "joining_date": "2026-01-05",
-                                       "manager_id": ea["id"]}).status_code == 422
+                                       **placement, "manager_id": ea["id"]}).status_code == 422
 
 
 def test_self_service_profile_edit_is_limited(signup):
@@ -159,9 +212,9 @@ def test_self_service_profile_edit_is_limited(signup):
 
 # ------------------------------------------------------------------ bulk import
 CSV = (
-    "employee_code,first_name,last_name,email,joining_date,department,manager_code\n"
-    "7001,Sara,Khan,sara@x.test,2026-02-01,Engineering,\n"
-    "7002,Omar,Ali,omar@x.test,15/03/2026,Engineering,7001\n"
+    "employee_code,first_name,last_name,email,joining_date,branch,department,manager_code\n"
+    "7001,Sara,Khan,sara@x.test,2026-02-01,Head Office,Engineering,\n"
+    "7002,Omar,Ali,omar@x.test,15/03/2026,Head Office,Engineering,7001\n"
 )
 
 
@@ -171,6 +224,7 @@ def _upload(api, url, text, name="people.csv", **data):
 
 def test_bulk_import_preview_then_commit(signup):
     owner = signup()
+    configure_employee_setup(owner)
     owner.post(f"{API}/departments", {"name": "Engineering"})
     pre = _upload(owner, "/employees/import/preview", CSV).json()
     assert pre["summary"] == {"total": 2, "valid": 2, "invalid": 0}
@@ -186,13 +240,13 @@ def test_bulk_import_reports_row_errors_and_does_not_corrupt(signup):
     owner = signup()
     mkemp(owner, employee_code="9000", email="dup@x.test")
     bad = (
-        "employee_code,first_name,last_name,email,joining_date,department\n"
-        "9001,Good,One,good@x.test,2026-02-01,\n"
-        "9000,Dup,Code,new@x.test,2026-02-01,\n"
-        "9002,Dup,Email,dup@x.test,2026-02-01,\n"
-        "9003,,NoFirst,x@x.test,2026-02-01,\n"
-        "9004,Bad,Date,y@x.test,not-a-date,\n"
-        "9005,Bad,Dept,z@x.test,2026-02-01,Nowhere\n"
+        "employee_code,first_name,last_name,email,joining_date,branch,department\n"
+        "9001,Good,One,good@x.test,2026-02-01,Head Office,General\n"
+        "9000,Dup,Code,new@x.test,2026-02-01,Head Office,General\n"
+        "9002,Dup,Email,dup@x.test,2026-02-01,Head Office,General\n"
+        "9003,,NoFirst,x@x.test,2026-02-01,Head Office,General\n"
+        "9004,Bad,Date,y@x.test,not-a-date,Head Office,General\n"
+        "9005,Bad,Dept,z@x.test,2026-02-01,Head Office,Nowhere\n"
     )
     pre = _upload(owner, "/employees/import/preview", bad).json()
     assert pre["summary"] == {"total": 6, "valid": 1, "invalid": 5}
@@ -208,8 +262,10 @@ def test_bulk_import_reports_row_errors_and_does_not_corrupt(signup):
 
 def test_bulk_import_duplicates_inside_the_file_and_bad_files(signup):
     owner = signup()
+    configure_employee_setup(owner)
     dup = "first_name,last_name,email,joining_date\nA,A,same@x.test,2026-01-01\nB,B,same@x.test,2026-01-01\n"
     rows = _upload(owner, "/employees/import/preview", dup).json()["rows"]
+    assert rows[0]["errors"] == ["branch is required", "department is required"]
     assert "duplicated in the file" in " ".join(rows[1]["errors"])
     assert _upload(owner, "/employees/import/preview", "x", name="a.exe").status_code == 422
     assert _upload(owner, "/employees/import/preview", "first_name\n").status_code == 422
@@ -217,7 +273,8 @@ def test_bulk_import_duplicates_inside_the_file_and_bad_files(signup):
 
 def test_bulk_import_column_mapping_and_aliases(signup):
     owner = signup()
-    csv = "Given,Surname,Mobile,Joined\nNadia,Iqbal,0300111,2026-04-01\n"
+    configure_employee_setup(owner)
+    csv = "Given,Surname,Mobile,Joined,Branch,Department\nNadia,Iqbal,0300111,2026-04-01,Head Office,General\n"
     r = owner.post(f"{API}/employees/import/preview", files={"file": ("m.csv", io.BytesIO(csv.encode()), "text/csv")},
                    data={"mapping": '{"Given": "first_name"}'})
     assert r.json()["summary"]["valid"] == 1
@@ -229,9 +286,10 @@ def test_bulk_import_respects_capacity(signup, db):
     from app.modules.tenancy.models import Tenant
 
     owner = signup()
+    configure_employee_setup(owner)
     db.scalar(select(Tenant)).employee_capacity = 2
     db.commit()
-    csv = "first_name,last_name,joining_date\nA,A,2026-01-01\nB,B,2026-01-01\n"
+    csv = "first_name,last_name,joining_date,branch,department\nA,A,2026-01-01,Head Office,General\nB,B,2026-01-01,Head Office,General\n"
     pre = _upload(owner, "/employees/import/preview", csv).json()
     assert pre["summary"]["valid"] == 1 and "limit" in " ".join(pre["rows"][1]["errors"])
 
@@ -311,12 +369,12 @@ def test_education_records_are_owned_by_the_employee(signup, new_client):
 
 def test_org_structure_rules(signup):
     owner = signup()
+    br = owner.post(f"{API}/branches", {"name": "Head Office", "city": "Peshawar"}).json()
     d = owner.post(f"{API}/departments", {"name": "Finance"}).json()
     assert owner.post(f"{API}/departments", {"name": "finance"}).status_code == 409
     sub = owner.post(f"{API}/departments", {"name": "Payables", "parent_id": d["id"]}).json()
     r = owner.put(f"{API}/departments/{d['id']}", {"name": "Finance", "parent_id": sub["id"]})
     assert r.status_code == 422 and r.json()["error"]["code"] == "department_cycle"
-    br = owner.post(f"{API}/branches", {"name": "Head Office", "city": "Peshawar"}).json()
     mkemp(owner, email="b@x.test", branch_id=br["id"], department_id=d["id"])
     assert owner.delete(f"{API}/branches/{br['id']}").status_code == 409
     assert owner.delete(f"{API}/departments/{d['id']}").status_code == 409

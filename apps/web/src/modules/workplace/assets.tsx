@@ -1,6 +1,6 @@
+import { useViewQuery } from '@/lib/view-state'
 import { Laptop, Plus } from 'lucide-react'
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, PageHeader } from '@/components/ui/card'
 import { Dialog, DialogClose, DialogContent, DialogFooter } from '@/components/ui/dialog'
@@ -110,11 +110,12 @@ function HistoryPanel({ asset, onClose }: { asset: Asset | null; onClose: () => 
 }
 
 export function AssetsPage() {
-  const [sp] = useSearchParams()
+  const [sp, update] = useViewQuery()
   const initialEmployeeId = sp.get('employee_id') ?? ''
-  const [status, setStatus] = React.useState(initialEmployeeId ? 'available' : '')
-  React.useEffect(() => { if (initialEmployeeId) setStatus('available') }, [initialEmployeeId])
-  const q = useGet<Asset[]>('/assets', { status: status || undefined })
+  const holderId = sp.get('holder_id')
+  const requestedStatus = sp.get('status')
+  const status = requestedStatus === 'all' ? '' : requestedStatus ?? (initialEmployeeId ? 'available' : '')
+  const q = useGet<Asset[]>('/assets', { status: status || undefined, holder_id: holderId || undefined })
   const [editing, setEditing] = React.useState<Asset | null>(null)
   const [adding, setAdding] = React.useState(false)
   const [assigning, setAssigning] = React.useState<Asset | null>(null)
@@ -124,8 +125,8 @@ export function AssetsPage() {
   return (
     <>
       <PageHeader title="Assets" description={initialEmployeeId ? 'Choose an available asset to assign to the employee you are onboarding.' : 'Company property, who has it and its full assignment history.'} actions={<Button onClick={() => setAdding(true)}><Plus className="h-4 w-4" />Add asset</Button>} />
-      <div className="mb-4"><Select aria-label="Filter by status" className="w-44" value={status} onChange={(e) => setStatus(e.target.value)}>{[['', 'All assets'], ['available', 'Available'], ['assigned', 'Assigned'], ['maintenance', 'In maintenance'], ['retired', 'Retired']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
-      <Card><DataTable rows={q.data} rowKey={(a) => a.id} query={q} empty="No assets yet" emptyHint="Add laptops, phones, access cards and other company property to track who holds them." emptyIcon={Laptop} cols={[
+      <div className="mb-4 flex flex-wrap items-center gap-3"><Select aria-label="Filter by status" className="w-44" disabled={!!holderId} value={holderId ? 'assigned' : status} onChange={(e) => update({ status: e.target.value || 'all' })}>{[['', 'All assets'], ['available', 'Available'], ['assigned', 'Assigned'], ['maintenance', 'In maintenance'], ['retired', 'Retired']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select>{holderId && <Button variant="ghost" onClick={() => update({ holder_id: null, status: null })}>Show all employees’ assets</Button>}</div>
+      <Card><DataTable rows={q.data} rowKey={(a) => a.id} query={q} empty={holderId ? 'No assets assigned to this employee' : status ? 'No assets match this status' : 'No assets yet'} emptyHint={!holderId && !status ? 'Add laptops, phones, access cards and other company property to track who holds them.' : undefined} emptyIcon={Laptop} cols={[
         { header: 'Asset', cell: (a) => <div><p className="font-semibold">{a.name}</p><p className="text-xs text-muted">{a.category}{a.serial_number && ` · ${a.serial_number}`}</p></div> },
         { header: 'Condition', cell: (a) => <span className="capitalize">{a.condition}</span> },
         { header: 'Held by', cell: (a) => (a.assigned_to ? <div><p className="font-medium">{a.assigned_to}</p><p className="text-xs text-muted">since {day(a.assigned_on)}</p></div> : <span className="text-subtle">Nobody</span>) },

@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, time, timedelta
+from typing import Literal
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, Forbidden, NotFound, ValidationFailed
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.modules.attendance import service
+from app.modules.attendance.location import PunchLocation, branch_premises, validate_location
 from app.modules.attendance.models import (
     AttendanceAdjustment,
     AttendanceDaily,
+    AttendancePolicy,
     Shift,
     ShiftAssignment,
 )
@@ -23,6 +26,7 @@ from app.modules.employees.models import LIVE_STATUSES, Employee
 from app.modules.identity.deps import AuthContext, check_origin, get_tenant_ctx, require
 from app.modules.leave.models import LeaveRequest
 from app.modules.notifications.service import notify_employee
+from app.modules.organization.models import Branch, Department
 from app.modules.tenancy import service as tenancy
 
 router = APIRouter(prefix="/attendance", tags=["attendance"], dependencies=[Depends(check_origin)])
@@ -73,6 +77,30 @@ class AssignIn(BaseModel):
     effective_from: date
 
 
+class AttendanceAccessIn(BaseModel):
+    channel: Literal["web", "mobile", "premises"] = "web"
+    enabled: bool
+    branch_id: uuid.UUID | None = None
+    department_id: uuid.UUID | None = None
+    employee_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
+    all_employees: bool = False
+
+
+class MobilePunchIn(BaseModel):
+    location: PunchLocation | None = None
+
+
+ACCESS_COLUMNS = {
+    "web": Employee.attendance_enabled,
+    "mobile": Employee.mobile_attendance_enabled,
+    "premises": Employee.premises_attendance_enabled,
+}
+
+
+def _channels(emp: Employee) -> dict[str, bool]:
+    return {channel: getattr(emp, column.key) for channel, column in ACCESS_COLUMNS.items()}
+
+
 def _me(db: Session, ctx: AuthContext) -> Employee | None:
     return emp_service.current_employee(db, ctx.membership.id if ctx.membership else None)
 
@@ -113,6 +141,33 @@ def put_policy(body: PolicyIn, ctx: AuthContext = Depends(require("attendance.ma
 
 
 # ------------------------------------------------------------------ self service
+@router.get("/employees/{employee_id}/settings")
+def employee_settings(employee_id: uuid.UUID, ctx: AuthContext = Depends(get_tenant_ctx),
+                      db: Session = Depends(get_db)):
+    emp_service.assert_can_view(db, ctx.permissions, _me(db, ctx), employee_id)
+    emp = emp_service.get_employee(db, employee_id)
+    on = utcnow().astimezone(service.tz_of(ctx.tenant)).date()
+    policy = db.scalar(select(AttendancePolicy))
+    assignment = service.current_shift_assignment(db, employee_id, on)
+    shift = db.get(Shift, assignment.shift_id) if assignment else None
+    start = shift.start_time if shift else policy.default_start if policy else None
+    end = shift.end_time if shift else policy.default_end if policy else None
+    return {
+        "attendance_enabled": emp.attendance_enabled,
+        "channels": _channels(emp),
+        "biometric_id": emp.bio_id,
+        "branch_id": emp.branch_id,
+        "location_required": bool(branch_premises(db, emp)),
+        "shift": shift.name if shift else None,
+        "effective_from": assignment.effective_from if assignment else None,
+        "start": start.strftime("%H:%M") if start else None,
+        "end": end.strftime("%H:%M") if end else None,
+        "break_minutes": shift.break_minutes if shift else policy.default_break_minutes if policy else None,
+        "grace_minutes": shift.grace_minutes if shift and shift.grace_minutes is not None
+        else policy.grace_minutes if policy else None,
+    }
+
+
 @router.get("/today")
 def today(ctx: AuthContext = Depends(require("attendance.read_own")), db: Session = Depends(get_db)):
     me = _me(db, ctx)
@@ -122,23 +177,55 @@ def today(ctx: AuthContext = Depends(require("attendance.read_own")), db: Sessio
     wd = service.work_date_for(db, ctx.tenant, me, now)
     row = service.recompute(db, ctx.tenant, me, wd)
     db.commit()
-    return {"work_date": wd, "state": service.open_state(db, ctx.tenant, me, now), "summary": _daily(row)}
+    return {"work_date": wd, "state": service.open_state(db, ctx.tenant, me, now), "summary": _daily(row),
+            "channels": _channels(me), "location_required": bool(branch_premises(db, me)),
+            "biometric_ready": bool(me.branch_id and me.bio_id), "can_punch": me.status in ("active", "probation")}
+
+
+def _self_punch(db: Session, ctx: AuthContext, kind: str, channel: Literal["web", "mobile"],
+                location: PunchLocation | None = None):
+    me = _me(db, ctx)
+    if me is not None:
+        # Serialize with other punches and admin access changes for this employee.
+        me = db.scalar(select(Employee).where(Employee.id == me.id, Employee.deleted_at.is_(None))
+                       .with_for_update().execution_options(populate_existing=True))
+    if kind == "in" and (me is None or me.status not in LIVE_STATUSES or me.status == "suspended"):
+        raise Forbidden("Your employee record cannot record attendance", code="not_allowed")
+    if me is None:
+        raise NotFound("No employee record is linked to your account")
+    if not _channels(me)[channel]:
+        raise Forbidden(f"{channel.capitalize()} attendance is disabled for your employee record", code="attendance_disabled")
+    premises = branch_premises(db, me)
+    if channel == "web" and premises:
+        raise Forbidden("Use mobile or a branch biometric device to punch at your assigned premises",
+                        code="web_blocked_by_premises")
+    if channel == "mobile":
+        validate_location(premises, location)
+    return _daily(service.check(db, ctx.tenant, me, kind, ctx.identity.id, source=channel))
 
 
 @router.post("/check-in")
-def check_in(ctx: AuthContext = Depends(require("attendance.record_own")), db: Session = Depends(get_db)):
-    me = _me(db, ctx)
-    if me is None or me.status not in LIVE_STATUSES or me.status == "suspended":
-        raise Forbidden("Your employee record cannot record attendance", code="not_allowed")
-    return _daily(service.check(db, ctx.tenant, me, "in", ctx.identity.id))
+def check_in(ctx: AuthContext = Depends(require("attendance.record_own")),
+             db: Session = Depends(get_db)):
+    return _self_punch(db, ctx, "in", "web")
 
 
 @router.post("/check-out")
-def check_out(ctx: AuthContext = Depends(require("attendance.record_own")), db: Session = Depends(get_db)):
-    me = _me(db, ctx)
-    if me is None:
-        raise NotFound("No employee record is linked to your account")
-    return _daily(service.check(db, ctx.tenant, me, "out", ctx.identity.id))
+def check_out(ctx: AuthContext = Depends(require("attendance.record_own")),
+              db: Session = Depends(get_db)):
+    return _self_punch(db, ctx, "out", "web")
+
+
+@router.post("/mobile/check-in")
+def mobile_check_in(body: MobilePunchIn | None = None, ctx: AuthContext = Depends(require("attendance.record_own")),
+                    db: Session = Depends(get_db)):
+    return _self_punch(db, ctx, "in", "mobile", body.location if body else None)
+
+
+@router.post("/mobile/check-out")
+def mobile_check_out(body: MobilePunchIn | None = None, ctx: AuthContext = Depends(require("attendance.record_own")),
+                     db: Session = Depends(get_db)):
+    return _self_punch(db, ctx, "out", "mobile", body.location if body else None)
 
 
 @router.get("/me")
@@ -150,8 +237,11 @@ def my_month(month: str = Query(pattern=r"^\d{4}-\d{2}$"), employee_id: uuid.UUI
         raise NotFound("No employee record is linked to your account")
     emp_service.assert_can_view(db, ctx.permissions, me, target)
     y, m = int(month[:4]), int(month[5:])
-    first = date(y, m, 1)
-    last = date(y + (m == 12), (m % 12) + 1, 1) - timedelta(days=1)
+    try:
+        first = date(y, m, 1)
+        last = date(y + (m == 12), (m % 12) + 1, 1) - timedelta(days=1)
+    except ValueError:
+        raise ValidationFailed("Choose a valid report month", code="invalid_month") from None
     rows = db.scalars(select(AttendanceDaily).where(
         AttendanceDaily.employee_id == target, AttendanceDaily.work_date >= first,
         AttendanceDaily.work_date <= last).order_by(AttendanceDaily.work_date)).all()
@@ -164,16 +254,65 @@ def my_month(month: str = Query(pattern=r"^\d{4}-\d{2}$"), employee_id: uuid.UUI
 
 
 # ------------------------------------------------------------------ team / HR views
+def _access_scope(db: Session, branch_id: uuid.UUID | None, department_id: uuid.UUID | None,
+                  employee_ids: list[uuid.UUID], all_employees: bool):
+    filtered = bool(branch_id or department_id or employee_ids)
+    if filtered == all_employees:
+        raise ValidationFailed("Choose a branch, department, or employees, or explicitly select the whole organization")
+    filters = [Employee.deleted_at.is_(None), Employee.status.in_(LIVE_STATUSES)]
+    for model, value, column in ((Branch, branch_id, Employee.branch_id),
+                                 (Department, department_id, Employee.department_id)):
+        if value is not None:
+            if db.get(model, value) is None:
+                raise NotFound(f"{model.__name__} not found")
+            filters.append(column == value)
+    if employee_ids:
+        filters.append(Employee.id.in_(employee_ids))
+    return filters
+
+
+@router.get("/access")
+def preview_access(branch_id: uuid.UUID | None = None, department_id: uuid.UUID | None = None,
+                   channel: Literal["web", "mobile", "premises"] = "web",
+                   all_employees: bool = False, ctx: AuthContext = Depends(require("attendance.manage")),
+                   db: Session = Depends(get_db)):
+    filters = _access_scope(db, branch_id, department_id, [], all_employees)
+    column = ACCESS_COLUMNS[channel]
+    counts = dict(db.execute(select(column, func.count()).where(*filters).group_by(column)).all())
+    rows = db.scalars(select(Employee).where(*filters).order_by(Employee.first_name, Employee.last_name, Employee.id)
+                      .limit(12))
+    return {"total": sum(counts.values()), "enabled": counts.get(True, 0),
+            "sample": [{"id": e.id, "name": e.full_name, "code": e.employee_code, "enabled": _channels(e)[channel]}
+                       for e in rows]}
+
+
+@router.patch("/access")
+def update_access(body: AttendanceAccessIn, ctx: AuthContext = Depends(require("attendance.manage")),
+                  db: Session = Depends(get_db)):
+    filters = _access_scope(db, body.branch_id, body.department_id, body.employee_ids, body.all_employees)
+    matched = db.scalar(select(func.count()).select_from(Employee).where(*filters)) or 0
+    if not matched or (body.employee_ids and matched != len(set(body.employee_ids))):
+        raise NotFound("One or more eligible employees could not be found")
+    column = ACCESS_COLUMNS[body.channel]
+    result = db.execute(update(Employee).where(*filters, column != body.enabled).values({column: body.enabled}))
+    changed = result.rowcount
+    tenancy.record_audit(db, tenant_id=ctx.tenant.id, actor=ctx.identity.id, action="attendance.access_updated",
+                         entity_type="employee", details={**body.model_dump(mode="json"), "changed": changed}, ip=ctx.ip)
+    db.commit()
+    return {"matched": matched, "changed": changed}
+
+
 @router.get("/daily")
 def daily(on: date = Query(alias="date"), branch_id: uuid.UUID | None = None, department_id: uuid.UUID | None = None,
+          page: int = Query(default=1, ge=1), paginated: bool = False,
           ctx: AuthContext = Depends(get_tenant_ctx), db: Session = Depends(get_db)):
     if "attendance.manage" not in ctx.permissions and "attendance.approve" not in ctx.permissions:
         raise Forbidden("You do not have permission to view team attendance", code="permission_denied")
     me = _me(db, ctx)
     allowed = None if "attendance.manage" in ctx.permissions else (
         emp_service.team_ids(db, me.id) if me else set())
-    rows_e, _ = emp_service.list_employees(db, allowed=allowed, branch_id=branch_id, department_id=department_id,
-                                           status="active", page=1, page_size=100)
+    rows_e, total = emp_service.list_employees(db, allowed=allowed, branch_id=branch_id, department_id=department_id,
+                                               status="active", page=page, page_size=100)
     names = emp_service.name_maps(db)
     daily_rows = {r.employee_id: r for r in db.scalars(select(AttendanceDaily).where(
         AttendanceDaily.work_date == on, AttendanceDaily.employee_id.in_([e.id for e in rows_e])))}
@@ -193,7 +332,7 @@ def daily(on: date = Query(alias="date"), branch_id: uuid.UUID | None = None, de
                      "department": names["department"].get(e.department_id)})
         out.append(item)
     db.commit()
-    return out
+    return {"items": out, "total": total, "page_size": 100} if paginated else out
 
 
 @router.post("/manual", status_code=201)
@@ -212,12 +351,15 @@ def manual(body: ManualIn, ctx: AuthContext = Depends(require("attendance.manage
 
 
 @router.post("/import")
-def import_csv(file: UploadFile = File(...), ctx: AuthContext = Depends(require("attendance.manage")),
+def import_csv(file: UploadFile = File(...), branch_id: uuid.UUID | None = Form(default=None),
+               ctx: AuthContext = Depends(require("attendance.manage")),
                db: Session = Depends(get_db)):
     data = file.file.read(5 * 1024 * 1024 + 1)
     if len(data) > 5 * 1024 * 1024:
         raise ValidationFailed("File is larger than 5 MB", code="file_too_large")
-    return service.import_punches(db, ctx.tenant, ctx.identity.id, data)
+    if branch_id is not None and db.get(Branch, branch_id) is None:
+        raise NotFound("Branch not found")
+    return service.import_punches(db, ctx.tenant, ctx.identity.id, data, branch_id=branch_id)
 
 
 # ------------------------------------------------------------------ corrections

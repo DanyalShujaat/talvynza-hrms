@@ -43,6 +43,7 @@ def test_foreign_role_and_membership_ids_are_not_found(signup):
     b = signup("b@b.test", "Org B")
     foreign_role = b.get("/api/v1/roles").json()[0]["id"]
     foreign_member = b.get("/api/v1/members").json()["items"][0]["membership_id"]
+    assert a.get("/api/v1/members", params={"membership_id": foreign_member}).json()["items"] == []
     assert a.put(f"/api/v1/roles/{foreign_role}/permissions", {"permissions": []}).status_code == 404
     assert a.put(f"/api/v1/members/{foreign_member}/roles", {"role_keys": ["employee"]}).status_code == 404
 

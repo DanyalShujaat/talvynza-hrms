@@ -14,8 +14,9 @@ from app.core.config import get_settings
 def make_engine(url: str | None = None) -> Engine:
     url = url or get_settings().database_url
     if url.startswith("sqlite"):
-        kwargs: dict = {"connect_args": {"check_same_thread": False}}
-        if ":memory:" in url or url == "sqlite://":
+        in_memory = ":memory:" in url or url == "sqlite://"
+        kwargs: dict = {"connect_args": {"check_same_thread": False, "timeout": 10}}
+        if in_memory:
             kwargs["poolclass"] = StaticPool
         eng = create_engine(url, **kwargs)
 
@@ -23,6 +24,8 @@ def make_engine(url: str | None = None) -> Engine:
         def _fk_pragma(dbapi_conn, _):  # enforce referential integrity on SQLite like PostgreSQL does
             cur = dbapi_conn.cursor()
             cur.execute("PRAGMA foreign_keys=ON")
+            if not in_memory:
+                cur.execute("PRAGMA journal_mode=WAL")
             cur.close()
 
         return eng

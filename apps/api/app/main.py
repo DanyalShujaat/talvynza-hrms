@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
     leave_service.register_handlers()
     s = get_settings()
     configure_logging(s.log_json)
-    app = FastAPI(title="Talvynza HRMS API", version="0.1.0", lifespan=lifespan,
+    app = FastAPI(title="Talvynza HRMS API", version="0.2.0", lifespan=lifespan,
                   docs_url="/api/docs", openapi_url="/api/openapi.json", redoc_url=None)
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(CORSMiddleware, allow_origins=s.cors_origin_list, allow_credentials=True,

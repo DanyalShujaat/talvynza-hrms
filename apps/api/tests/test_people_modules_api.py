@@ -80,6 +80,8 @@ def test_goals_and_visibility(signup, new_client):
     assert worker.post(f"{API}/goals", {"title": "For my boss", "employee_id": boss_emp["id"]}).status_code == 404
     assert len(worker.get(f"{API}/goals").json()) == 2
     assert len(boss.get(f"{API}/goals", params={"scope": "team"}).json()) == 2
+    assert len(boss.get(f"{API}/goals", params={"scope": "team", "employee_id": worker_emp["id"]}).json()) == 2
+    assert worker.get(f"{API}/goals", params={"employee_id": boss_emp["id"]}).json() == []
     assert worker.get(f"{API}/goals", params={"scope": "team"}).status_code == 403
     done = worker.patch(f"{API}/goals/{g['id']}", {"progress": 100}).json()
     assert done["status"] == "achieved"

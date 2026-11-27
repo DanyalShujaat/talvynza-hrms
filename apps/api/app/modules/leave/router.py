@@ -148,6 +148,7 @@ def apply_leave(body: ApplyIn, ctx: AuthContext = Depends(require("leave.apply")
 
 @router.get("/requests")
 def list_requests(scope: str = Query("mine", pattern="^(mine|team|all)$"), status: str | None = None,
+                  employee_id: uuid.UUID | None = None,
                   ctx: AuthContext = Depends(get_tenant_ctx), db: Session = Depends(get_db)):
     me = _me(db, ctx)
     stmt = select(LeaveRequest).order_by(LeaveRequest.created_at.desc())
@@ -165,6 +166,8 @@ def list_requests(scope: str = Query("mine", pattern="^(mine|team|all)$"), statu
         stmt = stmt.where(LeaveRequest.employee_id == me.id)
     if status:
         stmt = stmt.where(LeaveRequest.status == status)
+    if employee_id:
+        stmt = stmt.where(LeaveRequest.employee_id == employee_id)
     rows = db.scalars(stmt.limit(300)).all()
     emps = {e.id: e for e in db.scalars(select(Employee).where(Employee.id.in_({r.employee_id for r in rows})))}
     return [_req(r, emps, {t.id: t.name for t in db.scalars(select(LeaveType))}) for r in rows]

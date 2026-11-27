@@ -107,9 +107,10 @@ def update_organization(body: OrgUpdateIn, ctx: AuthContext = Depends(require("o
 
 
 @router.get("/members")
-def members(params: PageParams = Depends(), ctx: AuthContext = Depends(require("members.read")),
+def members(params: PageParams = Depends(), membership_id: uuid.UUID | None = None,
+            ctx: AuthContext = Depends(require("members.read")),
             db: Session = Depends(get_db)):
-    items, total = service.list_members(db, ctx.tenant.id, params)
+    items, total = service.list_members(db, ctx.tenant.id, params, membership_id)
     return {"items": items, "total": total, "page": params.page, "page_size": params.page_size}
 
 

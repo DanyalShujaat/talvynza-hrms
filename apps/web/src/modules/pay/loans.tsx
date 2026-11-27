@@ -1,3 +1,4 @@
+import { useRecordFocus, useViewQuery } from '@/lib/view-state'
 import { HandCoins, Plus } from 'lucide-react'
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
@@ -79,6 +80,9 @@ function LoanPanel({ id, manage, onClose }: { id: string | null; manage: boolean
 }
 
 export function MyLoansPage() {
+  const [params] = useViewQuery()
+  const record = params.get('record')
+  const focusRow = useRecordFocus(record)
   const [open, setOpen] = React.useState(false)
   const [view, setView] = React.useState<string | null>(null)
   const q = useGet<Loan[]>('/loans', { scope: 'mine' })
@@ -88,7 +92,7 @@ export function MyLoansPage() {
       <PageHeader title="Loans and advances" description="Your requests, balances and repayment schedules." actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" />New request</Button>} />
       {q.isLoading ? <Skeleton className="h-32 w-full rounded-xl" /> : q.isError ? <Card><ErrorState message={errorMessage(q.error)} /></Card> : !q.data?.length ? <Card><EmptyState title="No loans or advances" description="Request a salary advance or a loan and follow its repayment here." icon={HandCoins} /></Card> : (
         <div className="grid gap-4 md:grid-cols-2">{q.data.map((l) => (
-          <Card key={l.id}><CardBody className="space-y-3">
+          <Card key={l.id} ref={l.id === record ? focusRow : undefined} tabIndex={l.id === record ? -1 : undefined} className={l.id === record ? 'scroll-mt-28 border-primary bg-primary-soft' : undefined}><CardBody className="space-y-3">
             <div className="flex items-start justify-between gap-3"><div><p className="text-[13px] text-muted">{kindLabel(l.kind)} · requested {formatDate(l.created_at, { dateStyle: 'medium' })}</p><p className="font-display text-2xl font-bold">{money(l.principal)}</p></div><StatusText status={l.status} /></div>
             {l.outstanding !== null && <><Progress tone="success" value={(1 - Number(l.outstanding) / Number(l.principal)) * 100} /><p className="text-[13px] text-muted">{money(l.outstanding)} still to repay over {l.installments} installment{l.installments === 1 ? '' : 's'}</p></>}
             {l.decision_note && <p className="text-[13px] text-muted">Note: {l.decision_note}</p>}
@@ -121,16 +125,18 @@ function DisburseDialog({ loan, onClose }: { loan: Loan | null; onClose: () => v
 }
 
 export function LoansPage() {
-  const [status, setStatus] = React.useState('')
+  const [query, update] = useViewQuery()
+  const status = query.get('status') ?? ''
+  const employeeId = query.get('employee_id')
   const [view, setView] = React.useState<string | null>(null)
   const [paying, setPaying] = React.useState<Loan | null>(null)
-  const q = useGet<Loan[]>('/loans', { scope: 'all', status: status || undefined })
+  const q = useGet<Loan[]>('/loans', { scope: 'all', status: status || undefined, employee_id: employeeId || undefined })
   const decide = useSend<{ id: string; approve: boolean }>('POST', (b) => `/loans/${b.id}/decision`, { invalidate: ['/loans', '/dashboard'], success: 'Decision saved' })
   return (
     <>
       <PageHeader title="Loans and advances" description="Approve requests, pay them out and follow repayment. Installments are deducted in payroll automatically." />
-      <div className="mb-4"><Select aria-label="Filter by status" className="w-48" value={status} onChange={(e) => setStatus(e.target.value)}>{[['', 'All'], ['requested', 'Waiting for approval'], ['approved', 'Approved, not paid out'], ['active', 'Being repaid'], ['closed', 'Closed'], ['rejected', 'Rejected']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
-      <Card><DataTable rows={q.data} rowKey={(l) => l.id} query={q} empty="No loans or advances" emptyIcon={HandCoins} cols={[
+      <div className="mb-4 flex flex-wrap items-center gap-3"><Select aria-label="Filter by status" className="w-48" value={status} onChange={(e) => update({ status: e.target.value, record: null })}>{[['', 'All statuses'], ['requested', 'Waiting for approval'], ['approved', 'Approved, not paid out'], ['active', 'Being repaid'], ['closed', 'Closed'], ['rejected', 'Rejected'], ['cancelled', 'Cancelled']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select>{employeeId && <Button variant="ghost" onClick={() => update({ employee_id: null, record: null })}>Show all employees’ loans</Button>}</div>
+      <Card><DataTable rows={q.data} rowKey={(l) => l.id} query={q} empty="No loans or advances" emptyIcon={HandCoins} focusKey={query.get('record')} cols={[
         { header: 'Employee', cell: (l) => <Person name={l.employee ?? 'Unknown'} sub={`${kindLabel(l.kind)} · ${formatDate(l.created_at, { dateStyle: 'medium' })}`} size="sm" /> },
         { header: 'Reason', cell: (l) => <span className="line-clamp-1 max-w-56 text-muted">{l.reason ?? ''}</span> },
         { header: 'Amount', right: true, cell: (l) => <span className="font-semibold">{money(l.principal)}</span> },

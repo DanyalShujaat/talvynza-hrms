@@ -13,10 +13,10 @@ interface Slip { entry_id: string; period_start: string; period_end: string; net
 interface Holiday { id: string; holiday_date: string; name: string }
 
 const ACTIONS = [
-  { to: '/me/leave?apply=1', label: 'Apply for leave', icon: CalendarDays, tone: 'bg-primary-soft text-primary' },
-  { to: '/me/attendance?tab=adjust', label: 'Fix attendance', icon: Clock, tone: 'bg-info-soft text-cyan' },
-  { to: '/me/expenses?new=1', label: 'Claim an expense', icon: ReceiptText, tone: 'bg-success-soft text-success' },
-  { to: '/me/helpdesk?new=1', label: 'Ask HR', icon: LifeBuoy, tone: 'bg-warning-soft text-warning' },
+  { to: '/me/leave?apply=1', permission: 'leave.apply', label: 'Apply for leave', icon: CalendarDays, tone: 'bg-primary-soft text-primary' },
+  { to: '/me/attendance?tab=adjust', permission: 'attendance.read_own', label: 'Request a time correction', icon: Clock, tone: 'bg-info-soft text-cyan' },
+  { to: '/me/expenses?new=1', permission: 'expenses.submit', label: 'Claim an expense', icon: ReceiptText, tone: 'bg-success-soft text-success' },
+  { to: '/me/helpdesk?new=1', permission: 'helpdesk.submit', label: 'Ask HR', icon: LifeBuoy, tone: 'bg-warning-soft text-warning' },
 ]
 
 export function MyHomePage() {
@@ -27,6 +27,8 @@ export function MyHomePage() {
   const slips = useGet<Slip[]>('/payslips', undefined, !!me?.permissions.includes('payslip.read_own'))
   const holidays = useGet<Holiday[]>('/holidays', { year: new Date().getFullYear() })
   if (!me?.employee) return null
+  const permissions = new Set(me.permissions)
+  const actions = ACTIONS.filter(action => permissions.has(action.permission))
   const emp = me.employee
   const today = localToday()
   const openTasks = (tasks.data ?? []).filter((t) => t.status !== 'done').slice(0, 5)
@@ -43,28 +45,28 @@ export function MyHomePage() {
           <h1 className="text-[22px] font-bold tracking-tight">{greeting()}, {emp.full_name.split(' ')[0]}</h1>
           <p className="mt-0.5 text-sm text-muted">{[emp.designation, emp.department].filter(Boolean).join(' · ') || me.active_organization?.name} · Employee ID {emp.employee_code}</p>
         </div>
-        <Link to="/me/profile" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">View profile<ChevronRight className="h-4 w-4" /></Link>
+        {permissions.has('employees.read_own') && <Link to="/me/profile" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">View profile<ChevronRight className="h-4 w-4" /></Link>}
       </CardBody></Card>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6">
-          <CheckInCard />
+          {permissions.has('attendance.read_own') && <CheckInCard />}
           {slip && (
             <Card><CardHeader><CardTitle>Latest payslip</CardTitle><Link to="/me/payslips" className="text-[13px] font-medium text-primary hover:underline">All payslips</Link></CardHeader>
               <CardBody><p className="text-xs text-muted">{formatDate(slip.period_start, { month: 'long', year: 'numeric' })}</p><p className="font-display text-2xl font-bold">{money(slip.net, slip.currency)}</p><p className="text-xs text-muted">Net pay</p></CardBody></Card>)}
         </div>
 
         <div className="space-y-6 lg:col-span-2">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {ACTIONS.map((a) => (
+          {!!actions.length && <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {actions.map((a) => (
               <Link key={a.to} to={a.to} className="group rounded-xl border border-border bg-surface p-4 shadow-card transition-colors hover:border-primary/40">
                 <span className={cn('mb-3 flex h-9 w-9 items-center justify-center rounded-lg', a.tone)}><a.icon className="h-[18px] w-[18px]" aria-hidden /></span>
                 <span className="text-sm font-semibold group-hover:text-primary">{a.label}</span>
               </Link>))}
-          </div>
+          </div>}
 
           <Card>
-            <CardHeader><CardTitle>Leave balance</CardTitle><Link to="/me/leave" className="text-[13px] font-medium text-primary hover:underline">Requests and history</Link></CardHeader>
+            <CardHeader><CardTitle>Leave balance</CardTitle>{permissions.has('leave.apply') && <Link to="/me/leave" className="text-[13px] font-medium text-primary hover:underline">Requests and history</Link>}</CardHeader>
             <CardBody>
               {stats.isLoading ? <Skeleton className="h-20 w-full" /> : balances.length === 0 ? <p className="text-sm text-muted">No leave has been granted for this year yet. HR grants entitlements at the start of the leave year.</p> : (
                 <div className="grid gap-5 sm:grid-cols-3">
@@ -78,14 +80,14 @@ export function MyHomePage() {
             </CardBody>
           </Card>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <Card>
               <CardHeader><CardTitle>My tasks</CardTitle><Link to="/me/tasks" className="text-[13px] font-medium text-primary hover:underline">Open board</Link></CardHeader>
               {tasks.isLoading ? <CardBody><Skeleton className="h-16 w-full" /></CardBody> : openTasks.length === 0 ? <EmptyState title="No open tasks" icon={ListChecks} /> : (
                 <ul className="divide-y divide-border">{openTasks.map((t) => (
                   <li key={t.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
                     <span className={cn('h-2 w-2 shrink-0 rounded-full', t.priority === 'high' ? 'bg-danger' : t.status === 'in_progress' ? 'bg-primary' : 'bg-border-strong')} aria-hidden />
-                    <span className="min-w-0 flex-1 truncate">{t.title}</span>
+                    <Link to={`/me/tasks?record=${t.id}`} className="min-w-0 flex-1 truncate font-medium text-primary hover:underline">{t.title}</Link>
                     {t.due_date && <span className={cn('shrink-0 text-xs', t.overdue ? 'font-semibold text-danger' : 'text-muted')}>{formatDate(t.due_date, { day: 'numeric', month: 'short' })}</span>}
                   </li>))}</ul>)}
             </Card>

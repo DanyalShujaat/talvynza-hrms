@@ -180,12 +180,14 @@ def _assert_can_grant(db: Session, actor_perms: set[str], role_ids: list[uuid.UU
                         details=sorted(excess))
 
 
-def list_members(db: Session, tenant_id: uuid.UUID, params):
+def list_members(db: Session, tenant_id: uuid.UUID, params, membership_id: uuid.UUID | None = None):
 
     stmt = (select(TenantMembership, Identity)
             .join(Identity, Identity.id == TenantMembership.identity_id)
             .where(TenantMembership.tenant_id == tenant_id, TenantMembership.status != "removed")
             .order_by(Identity.full_name))
+    if membership_id:
+        stmt = stmt.where(TenantMembership.id == membership_id)
     total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
     rows = db.execute(stmt.limit(params.page_size).offset(params.offset)).all()
     out = [{"membership_id": m.id, "identity_id": i.id, "email": i.email, "full_name": i.full_name,

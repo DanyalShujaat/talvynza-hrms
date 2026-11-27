@@ -1,61 +1,157 @@
-.tali-root{position:fixed;right:18px;bottom:10px;z-index:35;font-family:inherit;pointer-events:none}
-.tali-root button,.tali-root input{font:inherit}
-.tali-pet-button{position:relative;display:block;width:104px;height:135px;margin-left:auto;border:0;background:transparent;cursor:pointer;pointer-events:auto;filter:drop-shadow(0 8px 11px rgba(5,47,79,.18));transition:transform .25s ease}
-.tali-pet-button:hover{transform:translateY(-5px)}
-.tali-pet-button:focus-visible,.tali-close:focus-visible,.tali-compose button:focus-visible,.tali-topics button:focus-visible{outline:3px solid #20b7c1;outline-offset:2px}
-.tali-pet-stage{position:absolute;inset:0 0 13px;z-index:1;display:block;pointer-events:none}
-.tali-pet-stage canvas{display:block}
-.tali-dream{position:absolute;z-index:2;right:9px;top:14px;color:#1477b3;font-size:15px;font-weight:900;line-height:1;transform:rotate(-12deg);animation:tali-drift 2.3s ease-in-out infinite}
-.tali-dream span:first-child{position:relative;top:-9px;margin-left:1px;font-size:12px}
-.tali-dream span:last-child{position:relative;top:-18px;margin-left:1px;font-size:9px}
-@keyframes tali-drift{0%,100%{transform:translateY(1px) rotate(-12deg);opacity:.6}50%{transform:translateY(-5px) rotate(-12deg);opacity:1}}
-.tali-pet-ground{position:absolute;left:14px;right:12px;bottom:13px;height:15px;border-radius:50%;background:radial-gradient(ellipse,rgba(7,83,126,.34),rgba(7,83,126,0) 73%);filter:blur(4px)}
-.tali-tag{position:absolute;z-index:2;top:5px;left:0;padding:4px 7px;border-radius:99px;background:#2c8d96;color:#fff;font-size:9px;font-weight:800;line-height:1;white-space:nowrap;box-shadow:0 2px 6px rgba(5,47,79,.18)}
-.tali-hello{position:absolute;z-index:3;right:82px;top:3px;white-space:nowrap;border:1px solid #c5e5ec;border-radius:13px 13px 4px 13px;background:#fff;padding:7px 10px;color:#07577e;font-size:11px;font-weight:700;box-shadow:0 6px 19px rgba(5,47,79,.13);opacity:0;transform:translateX(4px);transition:opacity .2s ease,transform .2s ease}
-.tali-pet-button:hover .tali-hello,.tali-pet-button:focus-visible .tali-hello{opacity:1;transform:translateX(0)}
-.tali-loading{display:grid;place-items:center;width:100%;height:100%;color:#0aadb9;font-size:32px}
-.tali-panel{display:flex;flex-direction:column;width:min(368px,calc(100vw - 28px));height:min(490px,calc(100dvh - 190px));min-height:280px;margin:0 0 0 auto;overflow:hidden;border:1px solid #c9e2e9;border-radius:21px;background:#f7fbfd;box-shadow:0 20px 65px rgba(5,36,65,.23);pointer-events:auto}
-.tali-panel-header{display:flex;align-items:center;gap:11px;padding:14px 15px;border-bottom:1px solid #dbeaf0;background:linear-gradient(105deg,#f0fbfd,#f1f6ff)}
-.tali-panel-mark,.tali-avatar{display:grid;place-items:center;flex:none;border-radius:12px;background:linear-gradient(145deg,#1364bd,#09b7b9);color:#fff}
-.tali-panel-mark{width:34px;height:34px;font-size:20px}
-.tali-panel-heading{display:grid;gap:2px;flex:1;color:#0c2e48}
-.tali-panel-heading strong{font-size:14px;line-height:1.1}
-.tali-panel-heading small{color:#5d7b8e;font-size:10px}
-.tali-status{display:flex;align-items:center;gap:6px;min-height:31px;padding:6px 15px;border-bottom:1px solid #e2edf1;color:#55758a;font-size:10px}
-.tali-status-dot{flex:none;width:6px;height:6px;border-radius:50%;background:#efa646}
-.tali-status-ready{background:#10b981}
-.tali-status button{display:grid;place-items:center;margin-left:auto;border:0;background:transparent;color:#1268b7;cursor:pointer}
-.tali-close{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:9px;background:transparent;color:#526c7d;cursor:pointer}
-.tali-close:hover{background:#dfeef3;color:#0c2e48}
-.tali-play{display:grid;place-items:center;width:30px;height:30px;border:1px solid #c9e2e9;border-radius:9px;background:#fff;color:#1268b7;cursor:pointer}
-.tali-play:hover{background:#e6f7fa}
-.tali-play:disabled{opacity:.45;cursor:not-allowed}
-.tali-messages{flex:1;overflow-y:auto;padding:17px 15px 12px}
-.tali-message{display:flex;align-items:flex-end;gap:7px;margin-bottom:15px}
-.tali-message-you{justify-content:flex-end}
-.tali-avatar{width:25px;height:25px;font-size:14px}
-.tali-bubble{max-width:85%;padding:10px 12px;border:1px solid #dcebf0;border-radius:13px 13px 13px 4px;background:#fff;color:#17364a;font-size:12px;line-height:1.5;box-shadow:0 2px 7px rgba(5,47,79,.04)}
-.tali-bubble p{margin:0}
-.tali-message-you .tali-bubble{border-color:#1268b7;border-radius:13px 13px 4px 13px;background:#1268b7;color:#fff}
-.tali-message-link{display:inline-flex;align-items:center;gap:4px;margin-top:8px;color:#086caa;font-weight:700;text-decoration:none}
-.tali-message-link:hover{text-decoration:underline}
-.tali-proposal{margin-top:10px;padding-top:9px;border-top:1px solid #dcebf0}
-.tali-proposal strong{display:block;font-size:11px}
-.tali-proposal div{display:flex;gap:7px;margin-top:8px}
-.tali-proposal button{border:1px solid #b7dce8;border-radius:8px;background:#e9f7fa;padding:5px 10px;color:#086482;font-size:11px;font-weight:700;cursor:pointer}
-.tali-proposal button:first-child{border-color:#1268b7;background:#1268b7;color:#fff}
-.tali-proposal button:disabled{opacity:.5;cursor:not-allowed}
-.tali-thinking{margin:0 0 8px 33px;color:#668497;font-size:11px}
-.tali-topics{display:flex;flex-wrap:wrap;gap:6px;padding:0 15px 12px}
-.tali-topics button{border:1px solid #b7dce8;border-radius:99px;background:#e9f7fa;padding:5px 9px;color:#086482;font-size:10px;font-weight:700;cursor:pointer}
-.tali-topics button:hover{background:#d4f0f5}
-.tali-topics button:disabled{opacity:.45;cursor:not-allowed}
-.tali-compose{display:flex;gap:7px;margin:0 12px;padding:6px;border:1px solid #c9e2e9;border-radius:13px;background:#fff}
-.tali-compose:focus-within{border-color:#1499b5;box-shadow:0 0 0 3px rgba(20,153,181,.12)}
-.tali-compose input{min-width:0;flex:1;border:0;outline:0;background:transparent;padding:5px 7px;color:#17364a;font-size:12px}
-.tali-compose input::placeholder{color:#7290a1}
-.tali-compose button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:9px;background:#1268b7;color:#fff;cursor:pointer}
-.tali-compose button:disabled{opacity:.45;cursor:not-allowed}
-.tali-disclosure{display:flex;align-items:center;justify-content:center;gap:4px;margin:7px 0 9px;color:#668497;font-size:9px;text-align:center}
-@media(max-width:640px){.tali-root{right:6px;bottom:3px}.tali-panel{height:min(470px,calc(100dvh - 140px))}.tali-pet-button{width:90px;height:117px}.tali-hello{right:72px}}
-@media(prefers-reduced-motion:reduce){.tali-pet-button{transition:none}.tali-pet-button:hover{transform:none}.tali-dream{animation:none}}
+.tali-root {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 35;
+}
+
+.tali-root button { cursor: pointer; }
+.tali-root button:disabled { cursor: default; opacity: .5; }
+.tali-root :is(button, a):focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+.tali-launcher {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 15px;
+  border-radius: 14px;
+  background: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(8 30 57 / 22%);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tali-launcher:hover { filter: brightness(.94); }
+
+.tali-panel {
+  display: flex;
+  width: min(410px, calc(100vw - 32px));
+  height: min(620px, calc(100dvh - 40px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: 0 20px 56px rgb(8 25 53 / 25%);
+}
+
+.tali-header {
+  position: relative;
+  display: flex;
+  min-height: 76px;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(110deg, var(--color-primary-soft), var(--color-surface) 76%);
+}
+
+.tali-mark, .tali-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.tali-mark { width: 39px; height: 39px; border: 1px solid var(--color-border); border-radius: 12px; }
+.tali-avatar { width: 26px; height: 26px; margin-top: 4px; border-radius: 8px; }
+.tali-heading { flex: 1; }
+.tali-heading h2 { font-size: 17px; font-weight: 750; line-height: 1.2; }
+.tali-heading p { margin-top: 3px; color: var(--color-muted); font-size: 12px; }
+.tali-character { width: 64px; height: 66px; flex: none; margin-block: -9px; pointer-events: none; }
+
+.tali-icon-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--color-muted);
+}
+
+.tali-icon-button:hover { background: var(--color-surface-2); color: var(--color-fg); }
+
+.tali-availability {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.tali-availability button, .tali-message-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tali-availability button:hover, .tali-message-link:hover { text-decoration: underline; }
+
+.tali-messages {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 16px 12px;
+}
+
+.tali-message { display: flex; align-items: flex-start; gap: 8px; }
+.tali-message-you { justify-content: flex-end; }
+.tali-bubble { max-width: calc(100% - 34px); padding: 10px 13px; border-radius: 4px 13px 13px; background: var(--color-surface-2); }
+.tali-bubble p { font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+.tali-message-you .tali-bubble { border-radius: 13px 4px 13px 13px; background: var(--color-primary-soft); }
+.tali-message-link { margin-top: 8px; }
+.tali-thinking { margin-left: 34px; color: var(--color-muted); font-size: 12px; }
+
+.tali-topics { display: grid; gap: 7px; margin-left: 34px; }
+.tali-topics button {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  color: var(--color-fg);
+  text-align: left;
+  font-size: 13px;
+}
+.tali-topics button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+.tali-proposal { display: grid; gap: 9px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-border); font-size: 13px; }
+.tali-proposal div { display: flex; flex-wrap: wrap; gap: 7px; }
+.tali-proposal button { padding: 5px 9px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); }
+.tali-proposal button:first-child { background: var(--color-primary); color: var(--color-surface); }
+
+.tali-footer { flex: none; padding: 12px 14px 10px; border-top: 1px solid var(--color-border); }
+.tali-footer p { margin-top: 7px; color: var(--color-muted); text-align: center; font-size: 11px; }
+.tali-compose { display: flex; align-items: end; gap: 8px; padding: 6px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface-2); }
+.tali-compose:focus-within { border-color: var(--color-primary); }
+.tali-compose textarea { min-width: 0; flex: 1; resize: none; padding: 6px; outline: none; font-size: 14px; }
+.tali-compose textarea::placeholder { color: var(--color-muted); }
+.tali-compose button { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border-radius: 8px; background: var(--color-primary); color: var(--color-surface); }
+
+@media (max-width: 460px) {
+  .tali-root { right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
+  .tali-panel { width: calc(100vw - 24px); height: min(620px, calc(100dvh - 24px)); }
+  .tali-header { gap: 8px; padding-inline: 11px; }
+  .tali-character { width: 52px; }
+  .tali-compose textarea { font-size: 16px; }
+}

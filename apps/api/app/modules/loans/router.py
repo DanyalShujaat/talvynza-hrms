@@ -109,6 +109,7 @@ def request_loan(body: LoanIn, ctx: AuthContext = Depends(require("loans.request
 
 @router.get("")
 def list_loans(scope: str = Query("mine", pattern="^(mine|all)$"), status: str | None = None,
+               employee_id: uuid.UUID | None = None,
                ctx: AuthContext = Depends(get_tenant_ctx), db: Session = Depends(get_db)):
     me = me_of(db, ctx)
     stmt = select(Loan).order_by(Loan.created_at.desc()).limit(300)
@@ -120,6 +121,8 @@ def list_loans(scope: str = Query("mine", pattern="^(mine|all)$"), status: str |
         stmt = stmt.where(Loan.employee_id == me.id)
     if status:
         stmt = stmt.where(Loan.status == status)
+    if employee_id:
+        stmt = stmt.where(Loan.employee_id == employee_id)
     rows = db.scalars(stmt).all()
     emps = emp_map(db, {r.employee_id for r in rows})
     return [_loan(r, emps, db) for r in rows]

@@ -77,10 +77,15 @@ def _check_serial(db: Session, serial: str | None, exclude: uuid.UUID | None = N
 
 
 @router.get("/assets")
-def list_assets(status: str | None = None, ctx: AuthContext = Depends(manage), db: Session = Depends(get_db)):
+def list_assets(status: str | None = None, holder_id: uuid.UUID | None = None,
+                ctx: AuthContext = Depends(manage), db: Session = Depends(get_db)):
     stmt = select(Asset).order_by(Asset.category, Asset.name)
     if status:
         stmt = stmt.where(Asset.status == status)
+    if holder_id:
+        current_assignments = select(AssetAssignment.asset_id).where(
+            AssetAssignment.employee_id == holder_id, AssetAssignment.returned_on.is_(None))
+        stmt = stmt.where(Asset.id.in_(current_assignments))
     holders = _holders(db)
     return [_asset(a, holders) for a in db.scalars(stmt)]
 

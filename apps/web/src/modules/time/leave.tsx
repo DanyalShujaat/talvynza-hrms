@@ -1,6 +1,6 @@
+import { useRecordFocus, useViewQuery, useViewTab } from '@/lib/view-state'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import * as React from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui/card'
 import { Dialog, DialogClose, DialogContent, DialogFooter } from '@/components/ui/dialog'
@@ -12,7 +12,7 @@ import { useMe } from '@/lib/queries'
 import { cn, formatDate } from '@/lib/utils'
 
 interface LType { id: string; name: string; allow_half_day: boolean; is_paid: boolean }
-interface Bal { leave_type_id: string; name: string; entitled: string; used: string; reserved: string; available: string }
+export interface Bal { leave_type_id: string; name: string; entitled: string; used: string; reserved: string; available: string; carried_forward: string }
 interface Req { id: string; employee: string | null; employee_code: string | null; leave_type: string | null; start_date: string; end_date: string; half_day: boolean; days: string; reason: string | null; status: string; decision_note: string | null }
 
 const range = (r: { start_date: string; end_date: string }) => {
@@ -21,13 +21,13 @@ const range = (r: { start_date: string; end_date: string }) => {
 }
 const days = (r: Req) => `${Number(r.days)} day${Number(r.days) === 1 ? '' : 's'}${r.half_day ? ' (half day)' : ''}`
 
-function ApplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function ApplyDialog({ open, onOpenChange, employeeId }: { open: boolean; onOpenChange: (o: boolean) => void; employeeId?: string }) {
   const types = useGet<LType[]>('/leave/types')
-  const balances = useGet<Bal[]>('/leave/balances')
+  const balances = useGet<Bal[]>('/leave/balances', { employee_id: employeeId })
   const [f, setF] = React.useState({ leave_type_id: '', start_date: today(), end_date: today(), half_day: false, reason: '' })
   const type = types.data?.find((t) => t.id === f.leave_type_id)
   const bal = balances.data?.find((b) => b.leave_type_id === f.leave_type_id)
-  const m = useSend<typeof f>('POST', '/leave/requests', { invalidate: ['/leave', '/dashboard'], success: 'Leave request submitted', onSuccess: () => { onOpenChange(false); setF({ ...f, reason: '' }) } })
+  const m = useSend<typeof f & { employee_id?: string }>('POST', '/leave/requests', { invalidate: ['/leave', '/dashboard'], success: 'Leave request submitted', onSuccess: () => { onOpenChange(false); setF({ ...f, reason: '' }) } })
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title="Apply for leave" description="Weekends and public holidays inside the dates are not counted.">
@@ -41,7 +41,7 @@ function ApplyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: 
           {type?.allow_half_day && <Checkbox label="Half day" checked={f.half_day} onChange={(e) => setF({ ...f, half_day: e.target.checked, end_date: e.target.checked ? f.start_date : f.end_date })} />}
           <Field id="l-r" label="Reason (optional)">{(a) => <Input value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} {...a} />}</Field>
         </div>
-        <DialogFooter><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose><Button loading={m.isPending} disabled={!f.leave_type_id} onClick={() => m.mutate(f)}>Submit request</Button></DialogFooter>
+        <DialogFooter><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose><Button loading={m.isPending} disabled={!f.leave_type_id} onClick={() => m.mutate({ ...f, employee_id: employeeId })}>Submit request</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   )
@@ -65,25 +65,31 @@ function Balances() {
   )
 }
 
-function Requests({ scope }: { scope: 'mine' | 'team' | 'all' }) {
-  const [status, setStatus] = React.useState(scope === 'mine' ? '' : 'pending')
-  const q = useGet<Req[]>('/leave/requests', { scope, status: status || undefined })
+export function Requests({ scope, employeeId }: { scope: 'mine' | 'team' | 'all'; employeeId?: string }) {
+  const [params, update] = useViewQuery()
+  const statusKey = employeeId ? 'leave_status' : 'status'
+  const chosen = params.get(statusKey) ?? (scope === 'mine' || employeeId ? 'all' : 'pending')
+  const status = chosen === 'all' ? '' : chosen
+  const record = employeeId ? null : params.get('record')
+  const focusRow = useRecordFocus(record)
+  const q = useGet<Req[]>('/leave/requests', { scope, status: status || undefined, employee_id: employeeId })
+  const { data: me } = useMe()
   const decide = useSend<{ id: string; approve: boolean }>('POST', (b) => `/leave/requests/${b.id}/decision`, { invalidate: ['/leave', '/dashboard', '/attendance'], success: 'Decision saved' })
   const cancel = useSend<string>('POST', (id) => `/leave/requests/${id}/cancel`, { invalidate: ['/leave', '/dashboard'], success: 'Request cancelled' })
   return (
     <>
-      <div className="mb-4"><Select aria-label="Filter by status" className="w-44" value={status} onChange={(e) => setStatus(e.target.value)}>
+      <div className="mb-4"><Select aria-label="Filter by status" className="w-44" value={status} onChange={(e) => update({ [statusKey]: e.target.value || 'all', record: null })}>
         {[['', 'All requests'], ['pending', 'Pending'], ['approved', 'Approved'], ['rejected', 'Rejected'], ['cancelled', 'Cancelled']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
       {q.isLoading ? <Skeleton className="h-40 w-full rounded-xl" /> : q.isError ? <Card><ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /></Card>
         : !q.data?.length ? <Card><EmptyState title={scope === 'mine' ? 'No leave requests yet' : 'Nothing waiting for a decision'} icon={CalendarDays} /></Card> : (
           <Card><ul className="divide-y divide-border">{q.data.map((r) => (
-            <li key={r.id} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+            <li key={r.id} ref={r.id === record ? focusRow : undefined} tabIndex={r.id === record ? -1 : undefined} className={cn('flex flex-wrap items-center justify-between gap-4 px-5 py-4', r.id === record && 'scroll-mt-28 bg-primary-soft')}>
               <div className="flex min-w-0 items-center gap-3">
                 {scope === 'mine'
                   ? <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"><CalendarDays className="h-5 w-5" aria-hidden /></span>
                   : null}
                 <div className="min-w-0">
-                  {scope !== 'mine' && <div className="mb-1"><Person name={r.employee ?? 'Unknown'} sub={r.employee_code} size="sm" /></div>}
+                {scope !== 'mine' && !employeeId && <div className="mb-1"><Person name={r.employee ?? 'Unknown'} sub={r.employee_code} size="sm" /></div>}
                   <p className="font-semibold">{r.leave_type} <span className="font-normal text-muted">· {days(r)}</span></p>
                   <p className="text-sm text-muted">{range(r)}{r.reason && ` · ${r.reason}`}</p>
                   {r.decision_note && <p className="mt-0.5 text-xs text-muted">Note: {r.decision_note}</p>}
@@ -91,7 +97,7 @@ function Requests({ scope }: { scope: 'mine' | 'team' | 'all' }) {
               </div>
               <div className="flex items-center gap-2">
                 <StatusText status={r.status} />
-                {scope !== 'mine' && r.status === 'pending' && <><Button size="sm" onClick={() => decide.mutate({ id: r.id, approve: true })}>Approve</Button><Button size="sm" variant="danger-soft" onClick={() => decide.mutate({ id: r.id, approve: false })}>Reject</Button></>}
+                {scope !== 'mine' && me?.permissions.includes('leave.approve') && r.status === 'pending' && <><Button size="sm" onClick={() => decide.mutate({ id: r.id, approve: true })}>Approve</Button><Button size="sm" variant="danger-soft" onClick={() => decide.mutate({ id: r.id, approve: false })}>Reject</Button></>}
                 {scope === 'mine' && ['pending', 'approved'].includes(r.status) && <ConfirmButton variant="outline" label="Cancel" title="Cancel this leave request?" message="Your balance is restored when you cancel." confirmLabel="Cancel request" onConfirm={() => cancel.mutate(r.id)} />}
               </div>
             </li>))}</ul></Card>)}
@@ -100,9 +106,9 @@ function Requests({ scope }: { scope: 'mine' | 'team' | 'all' }) {
 }
 
 export function MyLeavePage() {
-  const [sp, setSp] = useSearchParams()
-  const [open, setOpen] = React.useState(sp.get('apply') === '1')
-  React.useEffect(() => { if (sp.get('apply')) setSp({}, { replace: true }) }, [sp, setSp])
+  const [sp, update] = useViewQuery()
+  const [open, setOpen] = React.useState(false)
+  React.useEffect(() => { if (sp.get('apply') === '1') { setOpen(true); update({ apply: null }) } }, [sp])
   return (
     <>
       <PageHeader title="My leave" description="Balances, requests and their status." actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" />Apply for leave</Button>} />
@@ -179,7 +185,7 @@ export function LeaveAdminPage() {
   const { data: me } = useMe()
   const all = !!me?.permissions.includes('leave.manage')
   type T = 'approvals' | 'planner'
-  const [tab, setTab] = React.useState<T>('approvals')
+  const [tab, setTab] = useViewTab<T>(['approvals', 'planner'], 'approvals')
   const pending = useGet<Req[]>('/leave/requests', { scope: all ? 'all' : 'team', status: 'pending' })
   return (
     <>

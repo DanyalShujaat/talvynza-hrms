@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import * as React from 'react'
 import { errorMessage } from '@/lib/api'
 import { cn, initials } from '@/lib/utils'
+import { useRecordFocus } from '@/lib/view-state'
 import { Button } from './button'
 import { EmptyState, ErrorState, Skeleton } from './card'
 import { Dialog, DialogClose, DialogContent, DialogFooter } from './dialog'
@@ -12,11 +13,20 @@ import { Dialog, DialogClose, DialogContent, DialogFooter } from './dialog'
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; count?: number }[]; value: T; onChange: (v: T) => void }) {
   if (tabs.length < 2) return null
   return (
-    <div role="tablist" className="mb-5 flex gap-1 overflow-x-auto border-b border-border">
+    <div role="tablist" className="mb-5 flex gap-1 overflow-x-auto border-b border-border" onKeyDown={event => {
+      const selected = tabs.findIndex(tab => tab.id === value)
+      const next = event.key === 'ArrowRight' ? (selected + 1) % tabs.length
+        : event.key === 'ArrowLeft' ? (selected + tabs.length - 1) % tabs.length
+          : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1
+      if (next < 0) return
+      event.preventDefault()
+      onChange(tabs[next].id)
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+    }}>
       {tabs.map((t) => (
         <button
-          key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)}
-          className={cn('-mb-px flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-2.5 pt-1 text-sm font-medium transition-colors',
+          key={t.id} type="button" role="tab" tabIndex={value === t.id ? 0 : -1} aria-selected={value === t.id} onClick={() => onChange(t.id)}
+          className={cn('-mb-px flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-2.5 pt-1 text-sm font-medium transition-colors focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-primary',
             value === t.id ? 'border-primary text-primary' : 'border-transparent text-muted hover:text-fg')}
         >
           {t.label}
@@ -174,10 +184,11 @@ export interface Col<T> { header: string; cell: (row: T) => React.ReactNode; cla
 interface QueryLike { isLoading: boolean; isError: boolean; error: unknown; refetch?: () => unknown }
 
 /** Table with built-in loading, error and empty states. */
-export function DataTable<T>({ rows, cols, rowKey, query, empty, emptyHint, emptyIcon, onRowClick }: {
+export function DataTable<T>({ rows, cols, rowKey, query, empty, emptyHint, emptyIcon, onRowClick, focusKey }: {
   rows: T[] | undefined; cols: Col<T>[]; rowKey: (row: T) => string; query?: QueryLike
-  empty: string; emptyHint?: string; emptyIcon?: LucideIcon; onRowClick?: (row: T) => void
+  empty: string; emptyHint?: string; emptyIcon?: LucideIcon; onRowClick?: (row: T) => void; focusKey?: string | null
 }) {
+  const focusRow = useRecordFocus(focusKey ?? null)
   if (query?.isLoading) return <div className="space-y-2.5 p-5">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-full" />)}</div>
   if (query?.isError) return <ErrorState message={errorMessage(query.error)} onRetry={query.refetch ? () => query.refetch?.() : undefined} />
   if (!rows?.length) return <EmptyState title={empty} description={emptyHint} icon={emptyIcon} />
@@ -186,10 +197,16 @@ export function DataTable<T>({ rows, cols, rowKey, query, empty, emptyHint, empt
       <table className="w-full border-collapse">
         <thead><tr className="border-b border-border">{cols.map((c) => <Th key={c.header} className={c.right ? 'text-right' : undefined}>{c.header}</Th>)}</tr></thead>
         <tbody className="divide-y divide-border">
-          {rows.map((r) => (
-            <tr key={rowKey(r)} tabIndex={onRowClick ? 0 : undefined} onKeyDown={onRowClick ? e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onRowClick(r) } } : undefined} onClick={onRowClick ? () => onRowClick(r) : undefined} className={cn('transition-colors hover:bg-surface-2/50', onRowClick && 'cursor-pointer')}>
+          {rows.map((r) => {
+            const key = rowKey(r)
+            const focused = key === focusKey
+            return <tr key={key} ref={focused ? focusRow : undefined} tabIndex={onRowClick ? 0 : focused ? -1 : undefined}
+              onKeyDown={onRowClick ? e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onRowClick(r) } } : undefined}
+              onClick={onRowClick ? e => { if (!(e.target as Element).closest('a, button, input, select, textarea, label, [role="button"]')) onRowClick(r) } : undefined}
+              className={cn('transition-colors focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-primary', focused ? 'scroll-mt-28 bg-primary-soft' : 'hover:bg-surface-2/50', onRowClick && 'cursor-pointer')}>
               {cols.map((c) => <Td key={c.header} className={cn(c.right && 'text-right', c.className)}>{c.cell(r)}</Td>)}
-            </tr>))}
+            </tr>
+          })}
         </tbody>
       </table>
     </div>

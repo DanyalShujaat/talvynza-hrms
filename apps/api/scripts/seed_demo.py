@@ -94,11 +94,13 @@ for d, n in ((f"{today.year}-12-25", "Quaid-e-Azam Day"), (f"{today.year + 1}-02
     owner.post("/holidays", {"holiday_date": d, "name": n})
 
 # ---------------------------------------------------------------- pay structure
+owner.call("PUT", "/attendance/policy", json=owner.get("/attendance/policy"))
 hra = owner.post("/payroll/components", {"name": "House rent allowance", "kind": "earning", "calc": "percent_of_basic", "default_value": "40"})
 medical = owner.post("/payroll/components", {"name": "Medical allowance", "kind": "earning", "calc": "percent_of_basic",
                                              "default_value": "10", "taxable": True, "exempt_percent_of_basic": "10"})
 pf = owner.post("/payroll/components", {"name": "Provident fund", "kind": "deduction", "calc": "percent_of_basic", "default_value": "5"})
 LINES = [{"component_id": c["id"]} for c in (hra, medical, pf)]
+owner.post("/payroll/templates", {"name": "Standard salary package", "basic": "95000", "lines": LINES})
 
 #          first      last        designation                 dept                 branch           manager  basic
 PEOPLE = [("Imran", "Qureshi", "Engineering Manager", "Engineering", "Head Office", None, 260000),

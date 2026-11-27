@@ -9,6 +9,8 @@ def test_task_assignment_blocking_and_completion_notify_participants(signup, new
     assert created.status_code == 201, created.text
     task_id = created.json()["id"]
     assert created.json()["status"] == "todo"
+    assert boss.get(f"{API}/tasks", params={"scope": "team", "assignee_id": worker_emp["id"]}).json()[0]["id"] == task_id
+    assert worker.get(f"{API}/tasks", params={"assignee_id": boss_emp["id"]}).json() == []
     assert any("New task" in n["title"] for n in worker.get(f"{API}/notifications").json()["items"])
 
     blocked = worker.patch(f"{API}/tasks/{task_id}", {"status": "blocked"})

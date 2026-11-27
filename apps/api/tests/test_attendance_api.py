@@ -40,6 +40,100 @@ def test_double_check_in_and_checkout_without_checkin_are_refused(signup):
     assert r.status_code == 409 and r.json()["error"]["code"] == "already_checked_in"
 
 
+def test_punch_after_shift_window_updates_the_current_workday(signup, monkeypatch):
+    from app.modules.attendance import router, service
+
+    owner = signup()
+    late = datetime.fromisoformat(utc(date.today(), 23, 30))
+    monkeypatch.setattr(service, "utcnow", lambda: late)
+    monkeypatch.setattr(router, "utcnow", lambda: late)
+    check_in = owner.post(f"{API}/attendance/mobile/check-in")
+    assert check_in.status_code == 200 and check_in.json()["first_in"] is not None
+    today = owner.get(f"{API}/attendance/today").json()
+    assert today["work_date"] == late.date().isoformat() and today["state"] == "in"
+    late += timedelta(minutes=10)
+    check_out = owner.post(f"{API}/attendance/mobile/check-out")
+    assert check_out.status_code == 200 and check_out.json()["worked_minutes"] == 10
+
+
+def test_branch_premises_gate_both_punches_and_removal_allows_anywhere(signup, new_client):
+    owner, worker, _, emp = setup(signup, new_client)
+    premises = f"{API}/branches/{emp['branch_id']}/premises"
+    check_in, check_out = f"{API}/attendance/mobile/check-in", f"{API}/attendance/mobile/check-out"
+    first = {"name": "Main entrance", "latitude": 34, "longitude": 71, "radius_m": 100}
+    second = {"name": "Annex", "latitude": 34.01, "longitude": 71, "radius_m": 80}
+    inside = {"latitude": 34.01, "longitude": 71, "accuracy_m": 5}
+    outside = {"latitude": 35, "longitude": 71, "accuracy_m": 5}
+    assert worker.get(premises).status_code == 403
+    assert worker.put(premises, {"premises": [first]}).status_code == 403
+    assert owner.put(premises, {"premises": [{**first, "radius_m": 0}]}).status_code == 422
+    assert owner.put(premises, {"premises": [first, {**first, "name": "MAIN ENTRANCE"}]}).status_code == 422
+    assert owner.get(premises).json() == {"premises": []}
+    assert owner.put(premises, {"premises": [first, second]}).status_code == 200
+    assert owner.get(premises).json() == {"premises": [first, second]}
+    assert worker.get(f"{API}/attendance/today").json()["location_required"] is True
+    assert worker.post(f"{API}/attendance/check-in", {"location": inside}).json()["error"]["code"] == "web_blocked_by_premises"
+    assert worker.post(check_in).json()["error"]["code"] == "location_required"
+    assert worker.post(check_in, {"location": outside}).json()["error"]["code"] == "outside_premises"
+    assert worker.post(check_in, {"location": {**inside, "accuracy_m": 200}}).json()["error"]["code"] == "location_inaccurate"
+    assert worker.post(check_in, {"location": inside}).status_code == 200
+    assert worker.post(f"{API}/attendance/check-out").json()["error"]["code"] == "web_blocked_by_premises"
+    assert worker.post(check_out).json()["error"]["code"] == "location_required"
+    assert worker.post(check_out, {"location": outside}).json()["error"]["code"] == "outside_premises"
+    assert owner.put(premises, {"premises": []}).status_code == 200
+    assert worker.get(f"{API}/attendance/today").json()["location_required"] is False
+    assert worker.post(check_out).status_code == 200
+
+
+def test_biometric_import_uses_the_selected_branch_and_employee_access(signup):
+    owner = signup()
+    first = mkemp(owner, first_name="Main worker", bio_id="23")
+    annex = owner.post(f"{API}/branches", {"name": "Annex"}).json()
+    second = mkemp(owner, first_name="Annex worker", branch_id=annex["id"], bio_id="23")
+    csv = f"bio_id,timestamp,kind\n23,{PAST.isoformat()}T17:00:00,out\n23,{PAST.isoformat()}T09:00:00,in\n"
+
+    def upload(branch):
+        return owner.post(f"{API}/attendance/import", files={"file": ("p.csv", io.BytesIO(csv.encode()), "text/csv")},
+                          data={"branch_id": branch} if branch else {})
+
+    assert upload(None).status_code == 422
+    assert owner.patch(f"{API}/attendance/access", {
+        "channel": "premises", "enabled": False, "employee_ids": [second["id"]],
+    }).status_code == 200
+    assert upload(annex["id"]).json()["errors"][0]["error"] == "premises attendance is disabled for this employee"
+    assert upload(first["branch_id"]).json()["imported"] == 2
+    assert upload(first["branch_id"]).json()["duplicates_ignored"] == 2
+    for emp, days in ((first, 1), (second, 0)):
+        report = owner.get(f"{API}/attendance/me", params={"employee_id": emp["id"], "month": PAST.strftime("%Y-%m")})
+        assert len(report.json()["days"]) == days
+
+
+def test_bulk_attendance_access_intersects_filters_and_requires_explicit_scope(signup, new_client):
+    owner, worker, _, emp = setup(signup, new_client)
+    other_branch = owner.post(f"{API}/branches", {"name": "Annex"}).json()
+    other_dept = owner.post(f"{API}/departments", {"name": "Support"}).json()
+    branch_only = mkemp(owner, first_name="BranchOnly", branch_id=emp["branch_id"], department_id=other_dept["id"])
+    department_only = mkemp(owner, first_name="DepartmentOnly", branch_id=other_branch["id"],
+                            department_id=emp["department_id"])
+    path = f"{API}/attendance/access"
+    scope = {"branch_id": emp["branch_id"], "department_id": emp["department_id"]}
+    assert owner.patch(path, {"enabled": False}).status_code == 422
+    assert owner.patch(path, {**scope, "enabled": False, "all_employees": True}).status_code == 422
+    assert worker.get(path, params=scope).status_code == 403
+    assert worker.patch(path, {**scope, "enabled": False}).status_code == 403
+    preview = owner.get(path, params=scope).json()
+    assert preview["total"] == preview["enabled"] == 2
+    assert owner.patch(path, {**scope, "enabled": False}).json() == {"matched": 2, "changed": 2}
+    assert owner.patch(path, {**scope, "enabled": False}).json() == {"matched": 2, "changed": 0}
+    assert worker.post(f"{API}/attendance/check-in").json()["error"]["code"] == "attendance_disabled"
+    assert worker.get(f"{API}/attendance/today").json()["channels"] == {"web": False, "mobile": True, "premises": True}
+    for e in (branch_only, department_only):
+        assert owner.get(f"{API}/attendance/employees/{e['id']}/settings").json()["attendance_enabled"] is True
+    assert owner.patch(path, {"employee_ids": [emp["id"]], "enabled": True}).json() == {"matched": 1, "changed": 1}
+    assert worker.post(f"{API}/attendance/check-in").status_code == 200
+    assert owner.patch(path, {"all_employees": True, "enabled": True}).json()["changed"] == 1
+
+
 def test_policy_roundtrip_and_permission(signup, new_client):
     owner, worker, boss, emp = setup(signup, new_client)
     pol = owner.get(f"{API}/attendance/policy").json()
@@ -140,6 +234,11 @@ def test_shift_crud_assignment_and_roster(signup, new_client):
     assert any("Shift assigned: Night" in n["title"] for n in worker.get(f"{API}/notifications").json()["items"])
     roster = {x["full_name"].split()[0]: x["shift"] for x in owner.get(f"{API}/shifts/roster").json()}
     assert roster["Worker"] == "Night"
+    path = f"{API}/attendance/employees/{emp['id']}/settings"
+    settings = boss.get(path).json()
+    assert settings["shift"] == "Night" and settings["start"] == "22:00" and settings["end"] == "06:00"
+    assert worker.get(path).status_code == 200
+    assert worker.get(f"{API}/attendance/employees/{my_employee_id(boss)}/settings").status_code == 404
     assert owner.delete(f"{API}/shifts/{night['id']}").status_code == 409  # in use
     assert owner.post(f"{API}/shifts/assign", {"shift_id": night["id"], "effective_from": "2026-01-01"}).status_code == 422
 

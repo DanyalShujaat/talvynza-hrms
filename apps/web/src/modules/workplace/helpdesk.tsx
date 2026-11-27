@@ -1,3 +1,4 @@
+import { useViewQuery } from '@/lib/view-state'
 import { ArrowLeft, LifeBuoy, Lock, Plus, Send } from 'lucide-react'
 import * as React from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
@@ -62,13 +63,14 @@ export function MyHelpdeskPage() {
 }
 
 export function HelpdeskPage() {
-  const [status, setStatus] = React.useState('active')
+  const [view, update] = useViewQuery()
+  const status = view.get('status') === 'all' ? '' : view.get('status') ?? 'active'
   const nav = useNavigate()
   const q = useGet<Ticket[]>('/tickets', { scope: 'all', status: status || undefined })
   return (
     <>
       <PageHeader title="Help desk" description="Tickets raised by employees. Each has a response target based on its priority." />
-      <div className="mb-4"><Select aria-label="Filter by status" className="w-44" value={status} onChange={(e) => setStatus(e.target.value)}>{[['active', 'Open tickets'], ['', 'All tickets'], ['resolved', 'Resolved'], ['closed', 'Closed']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
+      <div className="mb-4"><Select aria-label="Filter by status" className="w-44" value={status} onChange={(e) => update({ status: e.target.value || 'all' })}>{[['active', 'Open tickets'], ['', 'All tickets'], ['resolved', 'Resolved'], ['closed', 'Closed']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></div>
       <Card><DataTable rows={q.data} rowKey={(t) => t.id} query={q} empty="No tickets here" emptyIcon={LifeBuoy} onRowClick={(t) => nav(`/helpdesk/${t.id}`)} cols={[
         { header: 'Ticket', cell: (t) => <div><p className="font-medium">{t.subject}</p><p className="text-xs text-muted">#{t.number} · {CATEGORY[t.category]}</p></div> },
         { header: 'Raised by', cell: (t) => <Person name={t.employee ?? 'Unknown'} size="sm" /> },

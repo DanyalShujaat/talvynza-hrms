@@ -1,6 +1,6 @@
 import io
 
-from tests.helpers import API, join, mkemp
+from tests.helpers import API, configure_employee_setup, join, mkemp
 
 PDF = b"%PDF-1.4 resume"
 
@@ -103,11 +103,18 @@ def test_custom_pipeline_rules(signup):
 
 def test_hire_converts_candidate_to_employee_once(signup):
     owner = signup()
+    job = owner.post(f"{API}/recruitment/jobs", {"title": "Dev"}).json()
+    app = owner.post(f"{API}/recruitment/applications", {"job_id": job["id"], "full_name": "Ada Lovelace", "email": "ada@x.test"}).json()
+    hire_url = f"{API}/recruitment/applications/{app['id']}/hire"
+    blocked = owner.post(hire_url, {"joining_date": "2026-12-01"})
+    assert blocked.status_code == 409 and blocked.json()["error"]["code"] == "employee_setup_required"
+    assert owner.get(f"{API}/recruitment/applications").json()[0]["stage"] == "Applied"
+
+    placement = configure_employee_setup(owner)
     dept = owner.post(f"{API}/departments", {"name": "Engineering"}).json()
     manager = mkemp(owner, email="manager@x.test")
-    job = owner.post(f"{API}/recruitment/jobs", {"title": "Dev", "department_id": dept["id"]}).json()
-    app = owner.post(f"{API}/recruitment/applications", {"job_id": job["id"], "full_name": "Ada Lovelace", "email": "ada@x.test"}).json()
-    r = owner.post(f"{API}/recruitment/applications/{app['id']}/hire", {"joining_date": "2026-12-01", "manager_id": manager["id"]})
+    r = owner.post(hire_url, {"joining_date": "2026-12-01", "manager_id": manager["id"],
+                             "branch_id": placement["branch_id"], "department_id": dept["id"]})
     assert r.status_code == 200
     emp = owner.get(f"{API}/employees/{r.json()['employee_id']}").json()
     assert emp["full_name"] == "Ada Lovelace" and emp["department"] == "Engineering" and emp["status"] == "probation"

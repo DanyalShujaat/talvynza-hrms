@@ -8,6 +8,7 @@ import { ConfirmButton, DataTable, Detail, Person, Progress, StatusText } from '
 import { Field, Input, Select, Textarea } from '@/components/ui/form'
 import { errorMessage } from '@/lib/api'
 import { money, today, useGet, useSend } from '@/lib/hooks'
+import { useMe } from '@/lib/queries'
 import { cn, formatDate } from '@/lib/utils'
 import { Opts, type EmpRow } from '@/modules/people/employees'
 
@@ -64,10 +65,11 @@ export function OffboardingPage() {
 
 export function OffboardingDetailPage() {
   const { id } = useParams()
+  const { data: me } = useMe()
   const q = useGet<Detail_>(`/offboarding/${id}`)
   const inv = ['/offboarding', '/employees', '/dashboard']
   const toggle = useSend<{ item: string; done: boolean }>('PATCH', (b) => `/offboarding/${id}/items/${b.item}`, { invalidate: inv })
-  const addItem = useSend<{ department: string; title: string }>('POST', `/offboarding/${id}/items`, { invalidate: inv })
+  const addItem = useSend<{ department: string; title: string }>('POST', `/offboarding/${id}/items`, { invalidate: inv, onSuccess: (_, item) => setNewItem(current => current.trim() === item.title ? '' : current) })
   const save = useSend<Record<string, unknown>>('PATCH', `/offboarding/${id}`, { invalidate: inv, success: 'Saved' })
   const complete = useSend<undefined>('POST', `/offboarding/${id}/complete`, { invalidate: inv, success: 'Exit completed. Access has been removed.' })
   const cancel = useSend<undefined>('POST', `/offboarding/${id}/cancel`, { invalidate: inv, success: 'Exit cancelled' })
@@ -79,9 +81,12 @@ export function OffboardingDetailPage() {
     if (q.data) { setInterview(q.data.exit_interview ?? ''); setS((x) => ({ ...x, ...Object.fromEntries(Object.entries(q.data.settlement).map(([k, v]) => [k, v ?? ''])) })) }
   }, [q.data])
   if (q.isLoading) return <Skeleton className="h-64 w-full rounded-xl" />
-  if (q.isError || !q.data) return <Card><ErrorState message={errorMessage(q.error)} /></Card>
+  if (q.isError || !q.data) return <Card><ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /></Card>
   const o = q.data
   const open = o.status === 'in_progress'
+  const permissions = new Set(me?.permissions ?? [])
+  const expenseTab = permissions.has('expenses.finance_approve') ? 'all' : 'team'
+  const profileBack = { to: `/offboarding/${o.id}`, label: 'Employee exit' }
   const blockers = [o.items.some((i) => !i.done) && 'Clearance items are still open', o.open_assets.length > 0 && 'Company assets have not been returned', Number(o.loan_balance) > 0 && 'A loan balance is outstanding'].filter(Boolean) as string[]
   return (
     <>
@@ -103,7 +108,7 @@ export function OffboardingDetailPage() {
                 <input type="checkbox" className="h-4 w-4 accent-[var(--color-primary)]" disabled={!open} checked={i.done} onChange={(e) => toggle.mutate({ item: i.id, done: e.target.checked })} />
                 <span className={cn('flex-1', i.done && 'text-muted line-through')}>{i.title}</span><span className="rounded bg-surface-2 px-2 py-0.5 text-xs text-muted">{i.department}</span>
               </label></li>))}</ul>
-            {open && <CardBody className="flex flex-wrap gap-2 border-t border-border"><Select aria-label="Clearance owner" className="w-36" value={itemDepartment} onChange={e => setItemDepartment(e.target.value)}>{['HR', 'IT', 'Finance', 'Manager', 'Facilities'].map(d => <option key={d}>{d}</option>)}</Select><Input className="min-w-48 flex-1" aria-label="New clearance item" placeholder="Add another step" value={newItem} onChange={(e) => setNewItem(e.target.value)} /><Button variant="outline" disabled={newItem.trim().length < 3} onClick={() => { addItem.mutate({ department: itemDepartment, title: newItem.trim() }); setNewItem('') }}>Add</Button></CardBody>}
+            {open && <CardBody className="flex flex-wrap gap-2 border-t border-border"><Select aria-label="Clearance owner" className="w-36" value={itemDepartment} onChange={e => setItemDepartment(e.target.value)}>{['HR', 'IT', 'Finance', 'Manager', 'Facilities'].map(d => <option key={d}>{d}</option>)}</Select><Input className="min-w-0 basis-44 flex-1" aria-label="New clearance item" placeholder="Add another step" value={newItem} onChange={(e) => setNewItem(e.target.value)} /><Button variant="outline" loading={addItem.isPending} disabled={newItem.trim().length < 3} onClick={() => addItem.mutate({ department: itemDepartment, title: newItem.trim() })}>Add</Button></CardBody>}
           </Card>
 
           <Card><CardHeader><CardTitle>Exit interview</CardTitle></CardHeader><CardBody className="space-y-3">
@@ -131,12 +136,17 @@ export function OffboardingDetailPage() {
               ['Approved, unpaid expenses', Number(o.approved_unpaid_expenses) > 0 ? money(o.approved_unpaid_expenses) : 'None'],
             ]} />
             {o.open_assets.length > 0 && <ul className="mt-3 space-y-1 text-[13px]">{o.open_assets.map((a) => <li key={a.asset_id} className="flex justify-between rounded-lg bg-surface-2 px-3 py-1.5"><span>{a.name}</span><span className="text-muted">{a.serial_number}</span></li>)}</ul>}
-            <div className="mt-3 flex flex-wrap gap-2 text-[13px]"><Link to="/assets" className="font-medium text-primary hover:underline">Go to assets</Link><Link to="/loans" className="font-medium text-primary hover:underline">Go to loans</Link><Link to="/expenses" className="font-medium text-primary hover:underline">Go to expenses</Link><Link to="/payroll" className="font-medium text-primary hover:underline">Go to payroll</Link></div>
+            <div className="mt-3 flex flex-wrap gap-3 text-[13px]">
+              {permissions.has('assets.manage') && <Link to={`/assets?holder_id=${o.employee_id}`} className="font-medium text-primary hover:underline">Assigned assets</Link>}
+              {permissions.has('loans.manage') && <Link to={`/loans?employee_id=${o.employee_id}`} className="font-medium text-primary hover:underline">Employee loans</Link>}
+              {(permissions.has('expenses.finance_approve') || permissions.has('expenses.approve')) && <Link to={`/expenses?tab=${expenseTab}&employee_id=${o.employee_id}`} className="font-medium text-primary hover:underline">Employee expenses</Link>}
+              {permissions.has('employees.read') && permissions.has('payroll.read') && <Link to={`/employees/${o.employee_id}?tab=payslips`} state={{ profileBack }} className="font-medium text-primary hover:underline">Employee payslips</Link>}
+            </div>
           </CardBody></Card>
           <Card><CardHeader><CardTitle>Unused leave</CardTitle></CardHeader><CardBody className="pt-2">
             {o.leave_balances.length ? <Detail rows={o.leave_balances.map((b) => [b.name, `${Number(b.available)} days`])} /> : <p className="py-2 text-sm text-muted">No leave balance this year.</p>}
           </CardBody></Card>
-          <Link to={`/employees/${o.employee_id}`} className="block text-center text-[13px] font-medium text-primary hover:underline">Open employee profile</Link>
+          {permissions.has('employees.read') && <Link to={`/employees/${o.employee_id}?tab=official`} state={{ profileBack }} className="block text-center text-[13px] font-medium text-primary hover:underline">Open employee profile</Link>}
         </div>
       </div>
     </>

@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, Index, Integer, String, Text, UniqueConstraint, Uuid, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, IdMixin, SoftDeleteMixin, TenantScoped, TimestampMixin
@@ -44,6 +44,9 @@ class Employee(Base, IdMixin, TimestampMixin, SoftDeleteMixin, TenantScoped):
     manager_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("employees.id"), nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), default="active")
+    attendance_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    mobile_attendance_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    premises_attendance_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     employment_type: Mapped[str] = mapped_column(String(30), default="full_time")
     contract_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
     contract_end: Mapped[date | None] = mapped_column(Date, nullable=True)

@@ -1,3 +1,4 @@
+import { useViewTab } from '@/lib/view-state'
 import { BookOpen, Clock, ExternalLink, GraduationCap, Plus } from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
@@ -57,7 +58,7 @@ function Catalog() {
 }
 
 export function MyTrainingPage() {
-  const [tab, setTab] = React.useState<'mine' | 'catalog'>('mine')
+  const [tab, setTab] = useViewTab(['mine', 'catalog'] as const, 'mine')
   return (
     <>
       <PageHeader title="Training" description="Courses assigned to you and the full catalog." />

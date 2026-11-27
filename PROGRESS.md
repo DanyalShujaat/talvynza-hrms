@@ -1,45 +1,13 @@
-# Progress
+# Project status
 
-Last updated 2026-11-14.
+[Changelog](CHANGELOG.md) records shipped changes. [Known limitations](docs/product/known-limitations.md) describes current scope and gaps.
 
-## Status by area
+| Area | Current scope |
+| --- | --- |
+| Organization and people | Branches, premises, departments, designations, employee profiles, placement history, onboarding, imports, and exits |
+| Attendance and leave | Web and mobile punches, branch biometric CSV import, shifts, corrections, leave balances, entitlements, and approvals |
+| Payroll | Salary components, templates and revisions, reviewed payroll runs, payslips, loan installments, and expense reimbursement |
+| Recruitment and workplace | Candidate pipeline, public applications, tasks, expenses, loans, assets, reviews, training, and help desk |
+| Workspace and access | Admin area, My Space, on-demand help, request inbox, notifications, roles, sessions, audit log, and Tali |
 
-| Area | State |
-|---|---|
-| Auth, sessions, MFA, CSRF, lockout | Done, tested |
-| Multi-tenancy (server-side tenant, ORM isolation), roles, permissions, invitations, audit log | Done, tested |
-| Organization: branches, departments, designations, holidays | Done, tested |
-| Employees: profile, lifecycle events, effective-dated placement, documents, education, onboarding checklist, bulk import | Done, tested |
-| Attendance: check in and out, policy (grace, lateness modes, overtime, weekends), shifts, rosters, corrections, CSV import | Done, tested |
-| Leave: types, ledger, per-year balances, approvals, pro-rated grants, carry-forward, planner | Done, tested |
-| Payroll: components, salary revisions, run workflow, payslips, payment export | Done, tested. Statutory deductions are not configured |
-| Recruitment: jobs, pipeline, interviews, public careers page, hire to employee | Done, tested |
-| Notices, in-app notifications, tasks | Done, tested |
-| Dashboard | Done, real data |
-| Frontend (Talvynza visual system) | Done for every module above, 14 browser tests |
-| Expenses, loans and advances, assets, training, help desk, performance, offboarding workflow | Not started |
-| Workflow engine, AI assistant, advanced reports, scheduled reports | Not started |
-| Billing, plans, entitlements, platform admin | Not started |
-| Docker, CI, PostgreSQL verification | Written, never run |
-
-## Tests run on 2026-11-14
-
-| Suite | Result |
-|---|---|
-| Backend pytest (SQLite) | 155 passed |
-| Backend ruff | clean |
-| Frontend vitest | 9 passed |
-| Frontend typecheck and production build | clean |
-| Playwright browser tests (Chromium) | 14 passed |
-
-## Migrations
-- `0001` identities, sessions, tenants, memberships, roles, permissions, invitations, audit log
-- `0002` branches, departments, designations, holidays, employees and related tables, attendance, leave, payroll,
-  recruitment, notices, notifications, tasks
-
-## Next steps
-1. Run the Docker stack and the CI migration job against PostgreSQL, fix what they find.
-2. Expenses, loans, assets, help desk, training, performance and the offboarding checklist.
-3. Plans, entitlements and billing with a sandbox payment gateway adapter.
-4. Row-level security in PostgreSQL as a second tenant isolation layer.
-5. Reports with CSV and PDF export, scheduled delivery.
+See the [system design](docs/architecture/system-design.md) and [product workflows](docs/product/workflows.md) for how these areas interact.

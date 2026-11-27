@@ -1,40 +1,50 @@
-import { GraduationCap, Plus, Trash2, Upload } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, CalendarDays, ChevronDown, ChevronRight, ClipboardList, Clock, FileText, GraduationCap, ListChecks, Plus, Receipt, ShieldCheck, Target, Trash2, Upload, UserRound, Wallet } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import * as React from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui/card'
 import { Dialog, DialogClose, DialogContent } from '@/components/ui/dialog'
-import { Avatar, ConfirmButton, StatusText, Tabs, Td, Th } from '@/components/ui/extras'
+import { Avatar, ConfirmButton, StatusText, Td, Th } from '@/components/ui/extras'
 import { Field, Input, Select } from '@/components/ui/form'
 import { errorMessage } from '@/lib/api'
-import { money, uploadFile, useGet, useSend } from '@/lib/hooks'
+import { money, today, uploadFile, useGet, useSend } from '@/lib/hooks'
 import { useMe } from '@/lib/queries'
-import { formatDate } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
+import { restoreView } from '@/lib/view-state'
 import { Opts, useOrgLists, type EmpRow } from '@/modules/people/employees'
+import { ProfileAccount, ProfileAttendance, ProfileCard, ProfileFacts, ProfileLeave, ProfilePerformance, ProfileTasks } from './employee-profile-sections'
+
+const EmployeePayslips = React.lazy(() => import('@/modules/pay/payroll').then(m => ({ default: m.EmployeePayslips })))
 
 interface Detail extends EmpRow {
+  membership_id: string | null
   emergency_contacts: { name?: string; phone?: string; relationship?: string }[]
   preferred_name: string | null; gender: string | null; date_of_birth: string | null; nationality: string | null; address: string | null
   employment_type: string; contract_type: string | null; contract_end: string | null; work_location: string | null; probation_end: string | null
   confirmation_date: string | null; exit_date: string | null; payment_method: string | null; national_id: string | null; bank_name: string | null; bank_account: string | null
 }
 
-function EditMyProfile({ emp }: { emp: Detail }) {
+function EditContactDetails({ emp, own = false }: { emp: Detail; own?: boolean }) {
   const [open, setOpen] = React.useState(false)
   const [f, setF] = React.useState({ preferred_name: '', phone: '', address: '', emergency_contacts: emp.emergency_contacts ?? [] })
-  const save = useSend<typeof f>('PATCH', '/me/employee', { invalidate: ['/me/employee', '/employees'], success: 'Your contact details have been updated', onSuccess: () => setOpen(false) })
-  return <Dialog open={open} onOpenChange={setOpen}><Button onClick={() => { setF({ preferred_name: emp.preferred_name ?? '', phone: emp.phone ?? '', address: emp.address ?? '', emergency_contacts: emp.emergency_contacts ?? [] }); setOpen(true) }}>Edit my details</Button><DialogContent title="My contact details" description="Update your personal contact information. Ask HR to change employment or banking details.">
-    <form className="space-y-4" onSubmit={e => { e.preventDefault(); save.mutate(f) }}>
-      <Field id="self-name" label="Preferred name">{a => <Input {...a} maxLength={80} value={f.preferred_name} onChange={e => setF({ ...f, preferred_name: e.target.value })} />}</Field>
-      <Field id="self-phone" label="Mobile number">{a => <Input {...a} type="tel" maxLength={40} value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} />}</Field>
-      <Field id="self-address" label="Home address">{a => <Input {...a} maxLength={400} value={f.address} onChange={e => setF({ ...f, address: e.target.value })} />}</Field>
+  const save = useSend<Partial<typeof f>>('PATCH', own ? '/me/employee' : `/employees/${emp.id}`, {
+    invalidate: ['/me/employee', '/employees'], success: 'Contact details updated', onSuccess: () => setOpen(false),
+  })
+  return <Dialog open={open} onOpenChange={setOpen}><Button size={own ? 'md' : 'sm'} variant={own ? 'primary' : 'outline'} onClick={() => { setF({ preferred_name: emp.preferred_name ?? '', phone: emp.phone ?? '', address: emp.address ?? '', emergency_contacts: emp.emergency_contacts ?? [] }); setOpen(true) }}>{own ? 'Edit my details' : 'Edit contacts'}</Button><DialogContent title={own ? 'My contact details' : 'Edit emergency contacts'} className="max-h-[90vh] overflow-auto">
+    <form className="space-y-4" onSubmit={e => { e.preventDefault(); save.mutate(own ? f : { emergency_contacts: f.emergency_contacts }) }}>
+      {own && <>
+        <Field id="self-name" label="Preferred name">{a => <Input {...a} maxLength={80} value={f.preferred_name} onChange={e => setF({ ...f, preferred_name: e.target.value })} />}</Field>
+        <Field id="self-phone" label="Mobile number">{a => <Input {...a} type="tel" maxLength={40} value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} />}</Field>
+        <Field id="self-address" label="Home address">{a => <Input {...a} maxLength={400} value={f.address} onChange={e => setF({ ...f, address: e.target.value })} />}</Field>
+      </>}
       <fieldset className="space-y-3 rounded-lg border border-border p-3"><legend className="px-1 text-sm font-semibold">Emergency contacts</legend>
         {f.emergency_contacts.map((c, i) => <div key={i} className="space-y-2 border-b border-border pb-3 last:border-0">{(['name', 'relationship', 'phone'] as const).map(key => <Field key={key} id={`contact-${i}-${key}`} label={`${key === 'name' ? 'Name' : key === 'phone' ? 'Phone' : 'Relationship'} ${i + 1}`}>{a => <Input {...a} required={key !== 'relationship'} maxLength={key === 'phone' ? 40 : 100} value={c[key] ?? ''} onChange={e => setF({ ...f, emergency_contacts: f.emergency_contacts.map((v, n) => n === i ? { ...v, [key]: e.target.value } : v) })} />}</Field>)}<Button type="button" size="sm" variant="ghost" onClick={() => setF({ ...f, emergency_contacts: f.emergency_contacts.filter((_, n) => n !== i) })}>Remove contact</Button></div>)}
         <Button type="button" variant="outline" size="sm" disabled={f.emergency_contacts.length >= 5} onClick={() => setF({ ...f, emergency_contacts: [...f.emergency_contacts, { name: '', phone: '', relationship: '' }] })}>Add emergency contact</Button>
       </fieldset>
-      <div className="flex justify-end gap-2"><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit" loading={save.isPending}>Save my details</Button></div>
+      <div className="flex justify-end gap-2"><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit" loading={save.isPending}>{own ? 'Save my details' : 'Save contacts'}</Button></div>
     </form></DialogContent></Dialog>
 }
 const LIFECYCLE = [
@@ -53,6 +63,7 @@ function LifecycleDialog({ emp }: { emp: Detail }) {
   const set = (k: string, v: string) => setD((x) => ({ ...x, [k]: v }))
   const m = useSend<unknown>('POST', `/employees/${emp.id}/lifecycle`, { invalidate: ['/employees', '/dashboard'], success: 'Recorded', onSuccess: () => { setOpen(false); setD({}) } })
   const details = Object.fromEntries(Object.entries(d).filter(([, v]) => v))
+  const transferDepartment = d.department_id || emp.department_id
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant="outline" onClick={() => setOpen(true)}>Lifecycle action</Button>
@@ -60,10 +71,11 @@ function LifecycleDialog({ emp }: { emp: Detail }) {
         <div className="space-y-4">
           <Field id="lc-kind" label="Event">{(a) => <Select value={kind} onChange={(e) => { setKind(e.target.value); setD({}) }} {...a}>{LIFECYCLE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select>}</Field>
           <Field id="lc-date" label="Effective date">{(a) => <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} {...a} />}</Field>
-          {kind === 'promotion' && <Field id="lc-des" label="New designation">{(a) => <Select value={d.designation_id ?? ''} onChange={(e) => set('designation_id', e.target.value)} {...a}><Opts list={designations} blank="Select" /></Select>}</Field>}
+          {kind === 'promotion' && <Field id="lc-des" label="New designation">{(a) => <Select value={d.designation_id ?? ''} onChange={(e) => set('designation_id', e.target.value)} {...a}><Opts list={designations.filter(item => !item.department_id || item.department_id === emp.department_id)} blank="Select" /></Select>}</Field>}
           {kind === 'transfer' && <>
             <Field id="lc-br" label="New branch">{(a) => <Select value={d.branch_id ?? ''} onChange={(e) => set('branch_id', e.target.value)} {...a}><Opts list={branches} blank="Keep current" /></Select>}</Field>
-            <Field id="lc-dp" label="New department">{(a) => <Select value={d.department_id ?? ''} onChange={(e) => set('department_id', e.target.value)} {...a}><Opts list={departments} blank="Keep current" /></Select>}</Field>
+            <Field id="lc-dp" label="New department">{(a) => <Select value={d.department_id ?? ''} onChange={(e) => setD(current => ({ ...current, department_id: e.target.value, designation_id: '' }))} {...a}><Opts list={departments} blank="Keep current" /></Select>}</Field>
+            {transferDepartment !== emp.department_id && <Field id="lc-transfer-designation" label="Designation in new department">{a => <Select {...a} value={d.designation_id ?? ''} onChange={e => set('designation_id', e.target.value)}><Opts list={designations.filter(item => !item.department_id || item.department_id === transferDepartment)} blank="Keep current designation" /></Select>}</Field>}
             <Field id="lc-mg" label="New manager">{(a) => <Select value={d.manager_id ?? ''} onChange={(e) => set('manager_id', e.target.value)} {...a}><Opts list={(people.data?.items ?? []).filter((p) => p.id !== emp.id).map((p) => ({ id: p.id, name: p.full_name }))} blank="Keep current" /></Select>}</Field></>}
           {kind === 'probation_extension' && <Field id="lc-pe" label="New probation end">{(a) => <Input type="date" value={d.probation_end ?? ''} onChange={(e) => set('probation_end', e.target.value)} {...a} />}</Field>}
           {kind === 'contract_renewal' && <Field id="lc-ce" label="New contract end">{(a) => <Input type="date" value={d.contract_end ?? ''} onChange={(e) => set('contract_end', e.target.value)} {...a} />}</Field>}
@@ -80,11 +92,14 @@ function EditDialog({ emp }: { emp: Detail }) {
   const { data: me } = useMe()
   const people = useGet<{ items: EmpRow[] }>('/employees', { status: 'active', page_size: 100 })
   const canBank = me?.permissions.includes('bank.read')
-  const { register, handleSubmit } = useForm({ values: {
+  const { register, handleSubmit, watch, setValue } = useForm({ values: {
     first_name: emp.first_name, last_name: emp.last_name, email: emp.email ?? '', phone: emp.phone ?? '', bio_id: emp.bio_id ?? '', address: emp.address ?? '', gender: emp.gender ?? '',
     date_of_birth: emp.date_of_birth ?? '', national_id: emp.national_id ?? '', branch_id: emp.branch_id ?? '', department_id: emp.department_id ?? '', designation_id: emp.designation_id ?? '',
     manager_id: emp.manager_id ?? '', work_location: emp.work_location ?? '', contract_end: emp.contract_end ?? '', bank_name: emp.bank_name ?? '', bank_account: emp.bank_account ?? '', payment_method: emp.payment_method ?? '',
+    preferred_name: emp.preferred_name ?? '', nationality: emp.nationality ?? '',
   } })
+  const department = watch('department_id')
+  const designation = watch('designation_id')
   const m = useSend<Record<string, unknown>>('PATCH', `/employees/${emp.id}`, { invalidate: ['/employees'], success: 'Saved', onSuccess: () => setOpen(false) })
   const submit = (v: Record<string, string>) => {
     const body: Record<string, unknown> = {}
@@ -101,6 +116,8 @@ function EditDialog({ emp }: { emp: Detail }) {
         <form onSubmit={handleSubmit(submit)} className="grid gap-3 sm:grid-cols-2">
           <Field id="e-fn" label="First name">{(a) => <Input {...a} {...register('first_name')} />}</Field>
           <Field id="e-ln" label="Last name">{(a) => <Input {...a} {...register('last_name')} />}</Field>
+          <Field id="e-pn" label="Preferred name">{(a) => <Input {...a} {...register('preferred_name')} />}</Field>
+          <Field id="e-nationality" label="Nationality">{(a) => <Input {...a} {...register('nationality')} />}</Field>
           <Field id="e-em" label="Email">{(a) => <Input type="email" {...a} {...register('email')} />}</Field>
           <Field id="e-ph" label="Mobile">{(a) => <Input {...a} {...register('phone')} />}</Field>
           <Field id="e-bio" label="Biometric ID">{(a) => <Input {...a} {...register('bio_id')} />}</Field>
@@ -108,8 +125,13 @@ function EditDialog({ emp }: { emp: Detail }) {
           <Field id="e-nid" label="National ID">{(a) => <Input {...a} {...register('national_id')} />}</Field>
           <Field id="e-g" label="Gender">{(a) => <Select {...a} {...register('gender')}><option value="">Not set</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></Select>}</Field>
           <Field id="e-br" label="Branch">{(a) => <Select {...a} {...register('branch_id')}><Opts list={branches} /></Select>}</Field>
-          <Field id="e-dp" label="Department">{(a) => <Select {...a} {...register('department_id')}><Opts list={departments} /></Select>}</Field>
-          <Field id="e-ds" label="Designation">{(a) => <Select {...a} {...register('designation_id')}><Opts list={designations} /></Select>}</Field>
+          <Field id="e-dp" label="Department">{(a) => <Select {...a} {...register('department_id', { onChange: e => {
+            const selected = designations.find(item => item.id === designation)
+            if (designation !== emp.designation_id && selected?.department_id && selected.department_id !== e.target.value) {
+              setValue('designation_id', emp.designation_id ?? '')
+            }
+          } })}><Opts list={departments} /></Select>}</Field>
+          <Field id="e-ds" label="Designation">{(a) => <Select {...a} {...register('designation_id')}><Opts list={designations.filter(item => !item.department_id || item.department_id === department || item.id === emp.designation_id)} /></Select>}</Field>
           <Field id="e-mg" label="Reporting manager">{(a) => <Select {...a} {...register('manager_id')}><Opts list={(people.data?.items ?? []).filter((p) => p.id !== emp.id).map((p) => ({ id: p.id, name: p.full_name }))} /></Select>}</Field>
           <Field id="e-wl" label="Work location">{(a) => <Input {...a} {...register('work_location')} />}</Field>
           <Field id="e-ce" label="Contract ends">{(a) => <Input type="date" {...a} {...register('contract_end')} />}</Field>
@@ -125,20 +147,60 @@ function EditDialog({ emp }: { emp: Detail }) {
   )
 }
 
-const Row = ({ k, v }: { k: string; v: React.ReactNode }) => <div className="flex justify-between gap-4 border-b border-border py-2.5 text-sm last:border-0"><dt className="text-muted">{k}</dt><dd className="text-right font-medium">{v || '-'}</dd></div>
+const profileDate = (value: string | null) => value && formatDate(value, { dateStyle: 'medium' })
+const humanize = (value: string | null) => value?.replaceAll('_', ' ')
 
-function Overview({ e }: { e: Detail }) {
+function Overview({ e, showNationalId, manage }: { e: Detail; showNationalId: boolean; manage: boolean }) {
+  const items: [string, React.ReactNode][] = [
+    ['Preferred name', e.preferred_name], ['Date of birth', profileDate(e.date_of_birth)],
+    ['Gender', <span className="capitalize">{e.gender || '-'}</span>], ['Nationality', e.nationality],
+    ['Address', e.address],
+  ]
+  if (showNationalId) items.push(['National ID', e.national_id])
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <Card><CardHeader><CardTitle>Personal</CardTitle></CardHeader><CardBody><dl>
-        <Row k="Email" v={e.email} /><Row k="Mobile" v={e.phone} /><Row k="Gender" v={e.gender} /><Row k="Date of birth" v={e.date_of_birth && formatDate(e.date_of_birth, { dateStyle: 'medium' })} />
-        <Row k="National ID" v={e.national_id} /><Row k="Address" v={e.address} /><Row k="Preferred name" v={e.preferred_name} /></dl></CardBody></Card>
-      <Card><CardHeader><CardTitle>Employment</CardTitle></CardHeader><CardBody><dl>
-        <Row k="Employee ID" v={e.employee_code} /><Row k="Biometric ID" v={e.bio_id} /><Row k="Branch" v={e.branch} /><Row k="Department" v={e.department} /><Row k="Designation" v={e.designation} />
-        <Row k="Type" v={e.employment_type.replace('_', ' ')} /><Row k="Joined" v={formatDate(e.joining_date, { dateStyle: 'medium' })} /><Row k="Probation ends" v={e.probation_end && formatDate(e.probation_end, { dateStyle: 'medium' })} />
-        <Row k="Contract ends" v={e.contract_end && formatDate(e.contract_end, { dateStyle: 'medium' })} /><Row k="Left on" v={e.exit_date && formatDate(e.exit_date, { dateStyle: 'medium' })} /></dl></CardBody></Card>
-      {(e.bank_name || e.bank_account) && <Card><CardHeader><CardTitle>Payment</CardTitle></CardHeader><CardBody><dl><Row k="Method" v={e.payment_method?.replace('_', ' ')} /><Row k="Bank" v={e.bank_name} /><Row k="Account" v={e.bank_account} /></dl></CardBody></Card>}
-      <Card><CardHeader><CardTitle>Emergency contacts</CardTitle></CardHeader><CardBody>{e.emergency_contacts?.length ? e.emergency_contacts.map((c, i) => <div key={i} className="border-b border-border py-2 last:border-0"><p className="font-semibold">{c.name}</p><p className="text-sm text-muted">{[c.relationship, c.phone].filter(Boolean).join(' · ')}</p></div>) : <p className="text-sm text-muted">No emergency contact on file.</p>}</CardBody></Card>
+    <div className="space-y-4">
+      <ProfileCard title="Basic information"><ProfileFacts items={items} /></ProfileCard>
+      <Card aria-labelledby="emergency-contacts">
+        <CardHeader><CardTitle id="emergency-contacts">Emergency contacts</CardTitle>{manage && <EditContactDetails emp={e} />}</CardHeader>
+        {e.emergency_contacts?.length ? (
+          <ul className="divide-y divide-border">
+            {e.emergency_contacts.map((contact, i) => (
+              <li key={i} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+                <div><p className="text-sm font-semibold">{contact.name}</p><p className="text-xs text-muted">{contact.relationship}</p></div>
+                <span className="text-sm">{contact.phone}</span>
+              </li>
+            ))}
+          </ul>
+        ) : <CardBody className="text-sm text-muted">No emergency contacts on file.</CardBody>}
+      </Card>
+    </div>
+  )
+}
+
+function OfficialInfo({ e, showHistory }: { e: Detail; showHistory: boolean }) {
+  const manager = useGet<Detail>(`/employees/${e.manager_id}`, undefined, !!e.manager_id)
+  return (
+    <div className="space-y-4">
+      <ProfileCard title="Employment and placement">
+        <ProfileFacts items={[
+          ['Employee ID', e.employee_code], ['Status', <StatusText status={e.status} />],
+          ['Employment type', <span className="capitalize">{humanize(e.employment_type)}</span>],
+          ['Branch', e.branch], ['Department', e.department], ['Designation', e.designation],
+          ['Work location', e.work_location], ['Joined', profileDate(e.joining_date)],
+          ['Probation ends', profileDate(e.probation_end)], ['Confirmed', profileDate(e.confirmation_date)],
+          ['Contract type', e.contract_type ? <span className="capitalize">{humanize(e.contract_type)}</span> : null],
+          ['Contract ends', profileDate(e.contract_end)], ['Left on', profileDate(e.exit_date)],
+          ['Reporting manager', manager.data?.full_name ?? (e.manager_id ? 'Assigned' : null)],
+        ]} />
+      </ProfileCard>
+      <Card>
+        <details key={String(showHistory)} open={showHistory} className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 font-semibold">
+            Employment history<ChevronDown className="h-4 w-4 text-muted group-open:rotate-180" aria-hidden />
+          </summary>
+          <div className="border-t border-border p-4"><History id={e.id} /></div>
+        </details>
+      </Card>
     </div>
   )
 }
@@ -179,12 +241,15 @@ function Education({ id, canEdit }: { id: string; canEdit: boolean }) {
           <Field id="q-rm" label="Remarks">{(a) => <Input {...a} {...register('remarks')} />}</Field>
           <div className="flex justify-end gap-2 sm:col-span-2"><DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose><Button type="submit" loading={add.isPending}>Save</Button></div>
         </form></DialogContent></Dialog></div>}
-      {q.isLoading ? <Skeleton className="h-32 w-full" /> : !q.data?.length ? <Card><EmptyState title="No qualifications recorded" /></Card> : (
+      {q.isLoading ? <Skeleton className="h-32 w-full" /> : q.isError ? <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /> : !q.data?.length ? <EmptyState title="No qualifications recorded" /> : (
         <div className="grid gap-4 md:grid-cols-2">{q.data.map((e) => (
           <Card key={e.id}><CardBody>
             <div className="flex items-start justify-between"><div className="flex gap-3"><GraduationCap className="mt-1 h-6 w-6 text-primary" aria-hidden /><div><p className="font-semibold">{e.degree}</p><p className="text-sm text-muted">{e.level}</p></div></div>
               {canEdit && <ConfirmButton label={<Trash2 className="h-4 w-4" />} title="Remove qualification" message={`Remove ${e.degree}?`} onConfirm={() => del.mutate(e.id)} />}</div>
-            <dl className="mt-3 border-t border-dashed border-border pt-3"><Row k="Board / University" v={e.institute} /><Row k="Marks" v={e.obtained_marks && `${e.obtained_marks} / ${e.total_marks ?? '?'}`} /><Row k="Grade" v={e.grade} /><Row k="Division" v={e.division} /><Row k="Remarks" v={e.remarks} /></dl>
+            <div className="mt-3"><ProfileFacts items={[
+              ['Institution', e.institute], ['Marks', e.obtained_marks && `${e.obtained_marks} / ${e.total_marks ?? '?'}`],
+              ['Grade', e.grade], ['Division', e.division], ['Remarks', e.remarks],
+            ]} /></div>
           </CardBody></Card>))}</div>)}
     </>
   )
@@ -209,34 +274,37 @@ function Documents({ id }: { id: string }) {
     <div className="space-y-5">
       <Card><CardHeader><CardTitle>Upload a document</CardTitle></CardHeader><CardBody className="flex flex-wrap items-end gap-3">
         <Field id="d-t" label="Title">{(a) => <Input value={title} onChange={(e) => setTitle(e.target.value)} {...a} />}</Field>
-        <Field id="d-c" label="Category">{(a) => <Select value={category} onChange={(e) => setCategory(e.target.value)} {...a}>{['contract', 'offer_letter', 'identification', 'certificate', 'experience_letter', 'other'].map((c) => <option key={c} value={c}>{c.replace('_', ' ')}</option>)}</Select>}</Field>
+        <Field id="d-c" label="Category">{(a) => <Select value={category} onChange={(e) => setCategory(e.target.value)} {...a}>{['contract', 'offer_letter', 'identification', 'certificate', 'experience_letter', 'dependent_document', 'license', 'reference', 'other'].map((c) => <option key={c} value={c}>{humanize(c)}</option>)}</Select>}</Field>
         <Field id="d-e" label="Expires (optional)">{(a) => <Input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} {...a} />}</Field>
         <Field id="d-f" label="File (PDF, image, Word, Excel; max 10 MB)">{(a) => <Input type="file" className="pt-1.5" onChange={(e) => setFile(e.target.files?.[0] ?? null)} {...a} />}</Field>
         <Button onClick={upload} loading={busy} disabled={!file || title.length < 2}><Upload className="h-4 w-4" />Upload</Button>
       </CardBody></Card>
-      <Card>{q.isLoading ? <CardBody><Skeleton className="h-16 w-full" /></CardBody> : q.isError ? <ErrorState message={errorMessage(q.error)} /> : !q.data?.length ? <EmptyState title="No documents" /> : (
+      <Card>{q.isLoading ? <CardBody><Skeleton className="h-16 w-full" /></CardBody> : q.isError ? <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /> : !q.data?.length ? <EmptyState title="No documents" /> : (
+        <div className="overflow-x-auto">
         <table className="w-full text-left"><thead className="border-b border-border"><tr><Th>Title</Th><Th>Category</Th><Th>Expires</Th><Th>Uploaded</Th><Th /></tr></thead>
           <tbody className="divide-y divide-border">{q.data.map((d) => (
             <tr key={d.id}><Td><p className="font-medium">{d.title}</p><p className="text-xs text-muted">{d.filename} · {(d.size_bytes / 1024).toFixed(0)} KB</p></Td><Td className="capitalize">{d.category.replace('_', ' ')}</Td>
               <Td>{d.expires_on ? formatDate(d.expires_on, { dateStyle: 'medium' }) : '-'}</Td><Td>{formatDate(d.created_at, { dateStyle: 'medium' })}</Td>
               <Td className="space-x-2 text-right"><Button asChild variant="outline" size="sm"><a href={`/api/v1/documents/${d.id}/download`}>Download</a></Button>
-                <ConfirmButton label="Delete" title="Delete document" message={`Permanently delete ${d.title}?`} onConfirm={() => del.mutate(d.id)} /></Td></tr>))}</tbody></table>)}</Card>
+                <ConfirmButton label="Delete" title="Delete document" message={`Permanently delete ${d.title}?`} onConfirm={() => del.mutate(d.id)} /></Td></tr>))}</tbody></table>
+        </div>)}</Card>
     </div>
   )
 }
 
 interface Rev { id: string; effective_from: string; basic: string; reason: string | null; lines: { name: string; amount: string }[] }
-function Salary({ id, canManage, currency }: { id: string; canManage: boolean; currency: string }) {
-  const q = useGet<Rev[]>(`/employees/${id}/salary`)
-  const comps = useGet<{ id: string; name: string; kind: string }[]>('/payroll/components')
+function Salary({ emp, canManage, canReadBank, currency }: { emp: Detail; canManage: boolean; canReadBank: boolean; currency: string }) {
+  const q = useGet<Rev[]>(`/employees/${emp.id}/salary`)
+  const comps = useGet<{ id: string; name: string; kind: string }[]>('/payroll/components', undefined, canManage)
   const [open, setOpen] = React.useState(false)
   const [from, setFrom] = React.useState(new Date().toISOString().slice(0, 10))
   const [basic, setBasic] = React.useState('')
   const [reason, setReason] = React.useState('')
   const [picked, setPicked] = React.useState<Record<string, string>>({})
-  const add = useSend<unknown, { warning: string | null }>('POST', `/employees/${id}/salary`, { invalidate: [`/employees/${id}/salary`], success: 'Salary revision saved', onSuccess: (r) => { if (r.warning) toast.warning(r.warning); setOpen(false); setBasic(''); setPicked({}) } })
+  const add = useSend<unknown, { warning: string | null }>('POST', `/employees/${emp.id}/salary`, { invalidate: [`/employees/${emp.id}/salary`, '/payroll/salary-roster'], success: 'Salary revision saved', onSuccess: (r) => { if (r.warning) toast.warning(r.warning); setOpen(false); setBasic(''); setPicked({}) } })
+  const current = q.data?.find(r => r.effective_from <= today())
   return (
-    <>
+    <div className="space-y-4">
       {canManage && <div className="mb-4 flex justify-end"><Dialog open={open} onOpenChange={setOpen}><Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" />New salary revision</Button>
         <DialogContent title="New salary revision" description="Revisions are never overwritten. The old salary stays on record and applies up to the day before this date.">
           <div className="space-y-3">
@@ -250,11 +318,16 @@ function Salary({ id, canManage, currency }: { id: string; canManage: boolean; c
             <div className="flex justify-end gap-2"><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
               <Button loading={add.isPending} disabled={!basic} onClick={() => add.mutate({ effective_from: from, basic, reason: reason || null, lines: Object.entries(picked).map(([component_id, amount]) => ({ component_id, amount: amount || null })) })}>Save revision</Button></div>
           </div></DialogContent></Dialog></div>}
-      <Card>{q.isLoading ? <CardBody><Skeleton className="h-16 w-full" /></CardBody> : q.isError ? <ErrorState message={errorMessage(q.error)} /> : !q.data?.length ? <EmptyState title="No salary on file" description="Payroll skips employees without a salary revision." /> : (
-        <ul className="divide-y divide-border">{q.data.map((r, i) => (
-          <li key={r.id} className="px-5 py-4 text-sm"><div className="flex items-center justify-between"><span className="font-semibold">{money(r.basic, currency)}</span><span className="text-muted">from {formatDate(r.effective_from, { dateStyle: 'medium' })} {i === 0 && <Badge tone="success" className="ml-2">current</Badge>}</span></div>
+      {current && <ProfileCard title="Current compensation">
+        <ProfileFacts items={[[ 'Basic pay', money(current.basic, currency) ], ['Effective from', profileDate(current.effective_from)], ['Payment method', <span className="capitalize">{humanize(emp.payment_method) ?? '-'}</span>]]} />
+        {!!current.lines.length && <div className="mt-4"><h3 className="mb-2 text-sm font-semibold">Allowances and deductions</h3><ProfileFacts items={current.lines.map(line => [line.name, money(line.amount, currency)])} /></div>}
+      </ProfileCard>}
+      {canReadBank && <ProfileCard title="Bank account"><ProfileFacts items={[[ 'Bank', emp.bank_name ], ['Account number / IBAN', emp.bank_account]]} /></ProfileCard>}
+      <Card><CardHeader><CardTitle>Salary revision history</CardTitle></CardHeader>{q.isLoading ? <CardBody><Skeleton className="h-16 w-full" /></CardBody> : q.isError ? <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /> : !q.data?.length ? <EmptyState title="No salary on file" description="Payroll skips employees without a salary revision." /> : (
+        <ul className="divide-y divide-border">{q.data.map(r => (
+          <li key={r.id} className="px-5 py-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{money(r.basic, currency)}</span><span className="text-muted">from {profileDate(r.effective_from)} {r.id === current?.id && <Badge tone="success" className="ml-2">Current</Badge>}{r.effective_from > today() && <Badge className="ml-2">Scheduled</Badge>}</span></div>
             {r.reason && <p className="text-muted">{r.reason}</p>}{r.lines.length > 0 && <p className="mt-1 text-muted">{r.lines.map((l) => `${l.name} ${money(l.amount)}`).join(' · ')}</p>}</li>))}</ul>)}</Card>
-    </>
+    </div>
   )
 }
 
@@ -275,7 +348,7 @@ function Checklist({ id }: { id: string }) {
     if (title.includes('equipment') || title.includes('asset')) return me?.permissions.includes('assets.manage') ? { to: `/assets?employee_id=${id}`, label: 'Assign an asset' } : null
     if (title.includes('orientation') || title.includes('training')) return me?.permissions.includes('training.manage') ? { to: '/training', label: 'Open training' } : null
     if (title.includes('payroll') || title.includes('salary')) return me?.permissions.includes('salary.read') ? { to: `/employees/${id}?tab=salary`, label: 'Open salary' } : null
-    if (title.includes('email') || title.includes('access')) return { to: `/employees/${id}?tab=overview`, label: 'Open profile access' }
+    if (title.includes('email') || title.includes('access')) return me?.permissions.includes('members.read') ? { to: `/employees/${id}?tab=account`, label: 'Open profile access' } : null
     return null
   }
   return (
@@ -307,36 +380,124 @@ function PortalAccess({ emp }: { emp: Detail }) {
   )
 }
 
+type ProfileTab = 'overview' | 'attendance' | 'official' | 'education' | 'documents' | 'salary' | 'payslips' | 'leave' | 'checklist' | 'account' | 'tasks' | 'performance'
+
 export function EmployeeDetailPage({ own = false }: { own?: boolean }) {
   const params = useParams()
-  const [sp, setSp] = useSearchParams()
+  const location = useLocation()
+  const [sp] = useSearchParams()
   const { data: me } = useMe()
   const mine = useGet<Detail>('/me/employee')
-  const other = useGet<Detail>(`/employees/${params.id}`, undefined, !own)
+  const other = useGet<Detail>(`/employees/${params.id}`, undefined, !own && !!params.id)
   const q = own ? mine : other
   const perms = new Set(me?.permissions ?? [])
   const e = q.data
   const isSelf = own || (!!e && e.id === mine.data?.id)
-  type TabId = 'overview' | 'history' | 'education' | 'documents' | 'salary' | 'checklist'
-  const requestedTab = (sp.get('tab') as TabId) || 'overview'
+  const requestedTab = sp.get('tab')
   if (q.isLoading) return <Skeleton className="h-64 w-full" />
-  if (q.isError || !e) return <Card><ErrorState message={errorMessage(q.error)} /></Card>
+  if (q.isError || !e) return <Card><ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} /></Card>
+
   const manage = perms.has('employees.manage')
-  const tabs: { id: TabId; label: string }[] = [{ id: 'overview', label: 'Overview' }, { id: 'history', label: 'History' }, { id: 'education', label: 'Education' }]
-  if (manage || own) tabs.push({ id: 'documents', label: 'Documents' })
-  if (!own && perms.has('salary.read')) tabs.push({ id: 'salary', label: 'Salary' })
-  if (manage) tabs.push({ id: 'checklist', label: 'Checklist' })
-  const tab = tabs.some(t => t.id === requestedTab) ? requestedTab : 'overview'
+  const canReadBank = isSelf || perms.has('bank.read')
+  const canReadSalary = !own && perms.has('salary.read')
+  const canReadDocuments = own || isSelf || manage || perms.has('documents.manage')
+  const canInvite = !own && manage && perms.has('members.manage') && ['active', 'probation', 'suspended'].includes(e.status)
+  const leaveScope = isSelf ? 'mine' : perms.has('leave.manage') ? 'all' : 'team'
+  const sections: { id: ProfileTab; label: string; icon: LucideIcon }[] = [
+    { id: 'overview', label: 'Overview', icon: UserRound },
+    { id: 'attendance', label: 'Attendance', icon: Clock },
+    { id: 'official', label: 'Official information', icon: BriefcaseBusiness },
+    canReadDocuments ? { id: 'documents', label: 'Documents', icon: FileText } : { id: 'education', label: 'Education', icon: GraduationCap },
+  ]
+  if (canReadSalary) sections.push({ id: 'salary', label: 'Salary details', icon: Wallet })
+  if ((!own && perms.has('payroll.read')) || (isSelf && perms.has('payslip.read_own'))) {
+    sections.push({ id: 'payslips', label: 'Payslips', icon: Receipt })
+  }
+  sections.push({ id: 'leave', label: 'Leave balance', icon: CalendarDays })
+  if (manage) sections.push({ id: 'checklist', label: 'Checklist', icon: ClipboardList })
+  if (!own && perms.has('members.read')) sections.push({ id: 'account', label: 'Account privileges', icon: ShieldCheck })
+  if (isSelf || perms.has('tasks.manage')) sections.push({ id: 'tasks', label: 'Assigned tasks', icon: ListChecks })
+  if ((isSelf && perms.has('performance.read_own')) || perms.has('performance.manage') || perms.has('performance.review_team')) {
+    sections.push({ id: 'performance', label: 'Performance', icon: Target })
+  }
+
+  const sectionId = requestedTab === 'history' ? 'official' : requestedTab === 'education' && canReadDocuments ? 'documents' : requestedTab
+  const tab = sections.find(section => section.id === sectionId)?.id ?? 'overview'
+  const navigation = location.state as { directorySearch?: string; profileBack?: { to: string; label: string } } | null
+  const viewScope = me?.active_organization ? `${me.identity.id}:${me.active_organization.id}` : undefined
+  const back = navigation?.profileBack ?? { label: 'Employees', to: navigation?.directorySearch != null
+    ? { pathname: '/employees', search: navigation.directorySearch }
+    : restoreView(viewScope, '/employees') }
+  const canOpenDirectory = !own && (perms.has('employees.read') || perms.has('employees.read_team'))
+  const placement = (value: string | null, filter: string, id: string | null) => canOpenDirectory && value && id
+    ? <Link className="text-primary hover:underline" to={`/employees?${filter}=${id}&status=all`}>{value}</Link>
+    : value
+  const status = <StatusText status={e.status} />
+
   return (
-    <>
-      <PageHeader title={e.full_name} description={`${e.designation ?? 'No designation'} · ${e.employee_code}`}
-        actions={<><StatusText status={e.status} />{own && <EditMyProfile emp={e} />}{manage && !own && perms.has('members.manage') && <PortalAccess emp={e} />}{manage && !own && <><LifecycleDialog emp={e} /><EditDialog emp={e} /></>}</>} />
-      <div className="mb-5 flex items-center gap-4"><Avatar name={e.full_name} size="xl" />
-        <p className="text-sm text-muted">{[e.department, e.branch].filter(Boolean).join(' · ') || 'No placement yet'}</p></div>
-      <Tabs tabs={tabs} value={tab} onChange={(t) => setSp({ tab: t })} />
-      {tab === 'overview' && <Overview e={e} />}{tab === 'history' && <History id={e.id} />}
-      {tab === 'education' && <Education id={e.id} canEdit={manage || isSelf || own} />}{tab === 'documents' && <Documents id={e.id} />}
-      {tab === 'salary' && <Salary id={e.id} canManage={perms.has('salary.manage')} currency={me?.active_organization?.currency ?? ''} />}{tab === 'checklist' && <Checklist id={e.id} />}
-    </>
+    <div className="space-y-5">
+      {!own && <Link to={back.to} className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-primary">
+        <ArrowLeft className="h-4 w-4" aria-hidden /> {back.label}
+      </Link>}
+      <Card className="overflow-hidden">
+        <div className="brand-gradient h-1" />
+        <div className="px-5 pt-5 sm:px-6">
+          <div className="flex items-start gap-4">
+            <Avatar name={e.full_name} size="xl" className="mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1 [&_[data-tour=page-header]]:mb-4">
+              <PageHeader title={e.full_name} description={[e.designation, e.employee_code].filter(Boolean).join(' · ')}
+                actions={<>{status}{own && <EditContactDetails emp={e} own />}{canInvite && !e.has_login && <PortalAccess emp={e} />}{manage && !own && <><LifecycleDialog emp={e} /><EditDialog emp={e} /></>}</>} />
+            </div>
+          </div>
+        </div>
+        <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-t border-border bg-surface-2/50 px-5 py-4 sm:px-6 xl:grid-cols-4">
+          {([
+            ['Branch', placement(e.branch, 'branch_id', e.branch_id)], ['Department', placement(e.department, 'department_id', e.department_id)],
+            ['Work email', e.email], ['Mobile', e.phone],
+          ] as const).map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted">{label}</dt><dd className="mt-0.5 break-words text-sm font-semibold">{value || '-'}</dd></div>)}
+        </dl>
+      </Card>
+
+      <div className="grid gap-5 lg:grid-cols-[12rem_minmax(0,1fr)] xl:grid-cols-[13.5rem_minmax(0,1fr)]">
+        <nav aria-label="Profile sections" className="flex flex-wrap gap-1 rounded-xl border border-border bg-surface p-2 lg:sticky lg:top-[4.5rem] lg:self-start lg:flex-col">
+          {sections.map(({ id, label, icon: Icon }) => (
+            <Button asChild key={id} variant="ghost" size="sm"
+              className={cn('shrink-0 justify-start gap-2 px-3', tab === id ? 'bg-primary-soft font-semibold text-primary' : 'text-muted')}>
+              <Link to={`?tab=${id}`} state={location.state} preventScrollReset aria-current={tab === id ? 'page' : undefined}>
+                <Icon className="h-4 w-4" aria-hidden />{label}
+                {tab === id && <ChevronRight className="ml-auto hidden h-3.5 w-3.5 lg:block" aria-hidden />}
+              </Link>
+            </Button>
+          ))}
+        </nav>
+
+        <div className="min-w-0" key={`${e.id}:${tab}`}>
+          {tab === 'overview' && <div className="space-y-4">
+            <Overview e={e} showNationalId={isSelf || manage} manage={manage && !own} />
+            {canReadBank && !canReadSalary && (e.bank_name || e.bank_account || e.payment_method) && (
+              <ProfileCard title="Payment"><ProfileFacts items={[[ 'Method', humanize(e.payment_method) ], ['Bank', e.bank_name], ['Account', e.bank_account]]} /></ProfileCard>
+            )}
+          </div>}
+          {tab === 'attendance' && <ProfileAttendance id={e.id} bioId={e.bio_id} canSetPolicy={perms.has('attendance.manage')} canManagePremises={perms.has('org.manage')}
+            canSetAccess={perms.has('attendance.manage') && ['active', 'probation', 'suspended'].includes(e.status)} />}
+          {tab === 'official' && <OfficialInfo e={e} showHistory={requestedTab === 'history'} />}
+          {(tab === 'education' || tab === 'documents') && <div className="space-y-4">
+            <ProfileCard title="Education"><Education id={e.id} canEdit={manage || isSelf} /></ProfileCard>
+            {tab === 'documents' && <Documents id={e.id} />}
+          </div>}
+          {tab === 'salary' && <Salary emp={e} canManage={perms.has('salary.manage')} canReadBank={canReadBank} currency={me?.active_organization?.currency ?? ''} />}
+          {tab === 'payslips' && <React.Suspense fallback={<Skeleton className="h-40" />}>
+            <EmployeePayslips employeeId={!own && perms.has('payroll.read') ? e.id : undefined} />
+          </React.Suspense>}
+          {tab === 'leave' && <ProfileLeave id={e.id} scope={leaveScope}
+            canApply={perms.has('leave.apply') && (isSelf || perms.has('leave.manage'))}
+            showRequests={isSelf || perms.has('leave.manage') || perms.has('leave.approve')} />}
+          {tab === 'checklist' && <Checklist id={e.id} />}
+          {tab === 'account' && <ProfileAccount membershipId={e.membership_id} canEdit={perms.has('members.manage')} invite={canInvite && <PortalAccess emp={e} />} />}
+          {tab === 'tasks' && <ProfileTasks id={e.id} scope={isSelf ? 'mine' : 'team'} />}
+          {tab === 'performance' && <ProfilePerformance id={e.id} scope={isSelf ? 'mine' : perms.has('performance.manage') ? 'all' : 'team'} />}
+        </div>
+      </div>
+    </div>
   )
 }

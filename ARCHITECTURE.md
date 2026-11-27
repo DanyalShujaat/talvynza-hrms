@@ -1,8 +1,10 @@
 # Architecture
 
+This guide explains code organization and technical decisions. See [system design](docs/architecture/system-design.md) for production topology and [product workflows](docs/product/workflows.md) for end-to-end flows.
+
 ## 1. Shape
 
-A modular monolith: one FastAPI service, one Celery worker, one PostgreSQL database, Redis for rate limiting and queues.
+A modular monolith with one FastAPI service, PostgreSQL for persistence, and Redis for infrastructure tasks.
 Business domains live in `apps/api/app/modules/<domain>/` and talk to each other through service functions and
 in-process events (`app/core/events.py`).
 
@@ -21,15 +23,14 @@ apps/api/app/
     recruitment/    jobs, candidates, applications, interviews, public careers
     notifications/  notices, in-app notifications, tasks
     reporting/      dashboard statistics
-    scheduling, performance, expenses, assets, training, workflows, billing, ai   (empty, not built)
+    performance, expenses, loans, assets, training, helpdesk, offboarding, ai
   models.py   imports every model module so Alembic and create_all see the whole schema
   main.py     app factory, middleware, routers, health checks
 apps/web/     React, TypeScript, Vite, Tailwind v4. TanStack Query for server state, Zustand for UI preferences only
 ```
 
-Each module is router (HTTP, validation, permission dependency), service (transactions, rules, audit), models.
-Routers hold no business logic. Services own `commit()`. Calculations that carry business rules are pure functions in
-`engine.py` files, so they are tested without a database.
+Modules declare routes, validate permissions, and use services and models to apply business rules and persist records.
+Attendance and payroll keep their core calculations in `engine.py` files for testing without a database.
 
 ## 2. Tenant isolation
 
@@ -92,7 +93,7 @@ See `docs/database/erd.md`.
 
 ## 7. Frontend
 
-A single-page app behind nginx in production, with a Vite proxy in development. The session cookie is not readable by
+A single-page app on Vercel in production, with a Vite proxy in development. The Docker stack uses nginx. The session cookie is not readable by
 JavaScript. The query cache is cleared when switching organization or signing out. The layout follows the existing
 Talvynza visual system: clear navigation, blue and teal accents from the logo, and readable dashboard cards.
 Playwright tests drive the real UI against a throwaway API.

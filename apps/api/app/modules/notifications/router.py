@@ -150,7 +150,8 @@ def _task(t: Task, emps: dict) -> dict:
 
 
 @router.get("/tasks")
-def list_tasks(scope: str = Query("mine", pattern="^(mine|team)$"), ctx: AuthContext = Depends(get_tenant_ctx),
+def list_tasks(scope: str = Query("mine", pattern="^(mine|team)$"), assignee_id: uuid.UUID | None = None,
+               ctx: AuthContext = Depends(get_tenant_ctx),
                db: Session = Depends(get_db)):
     me = _me(db, ctx)
     stmt = select(Task).order_by(Task.status, Task.due_date.is_(None), Task.due_date)
@@ -163,6 +164,8 @@ def list_tasks(scope: str = Query("mine", pattern="^(mine|team)$"), ctx: AuthCon
         if me is None:
             return []
         stmt = stmt.where(Task.assignee_id == me.id)
+    if assignee_id:
+        stmt = stmt.where(Task.assignee_id == assignee_id)
     rows = db.scalars(stmt.limit(300)).all()
     emps = {e.id: e for e in db.scalars(select(Employee).where(Employee.id.in_({t.assignee_id for t in rows})))}
     return [_task(t, emps) for t in rows]

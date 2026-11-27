@@ -1,3 +1,4 @@
+import { useViewTab } from '@/lib/view-state'
 import { BarChart3, Download } from 'lucide-react'
 import * as React from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -116,7 +117,7 @@ export function ReportsPage() {
   type T = 'headcount' | 'attendance' | 'leave' | 'payroll'
   const tabs: { id: T; label: string }[] = [{ id: 'headcount', label: 'Headcount' }, { id: 'attendance', label: 'Attendance' }, { id: 'leave', label: 'Leave' }]
   if (me?.permissions.includes('payroll.read')) tabs.push({ id: 'payroll', label: 'Payroll' })
-  const [tab, setTab] = React.useState<T>('headcount')
+  const [tab, setTab] = useViewTab(tabs.map(item => item.id), 'headcount')
   if (!me?.permissions.includes('reports.view')) return <Card><EmptyState icon={BarChart3} title="Reports are not available for your role" /></Card>
   return (
     <>

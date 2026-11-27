@@ -6,9 +6,9 @@ import { guideFor } from '@/components/layout/guides'
 import { cn } from '@/lib/utils'
 import { Button } from './button'
 
-export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('rounded-xl border border-border bg-surface shadow-card', className)} {...p} />
-)
+export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...p }, ref) => (
+  <div ref={ref} className={cn('rounded-xl border border-border bg-surface shadow-card', className)} {...p} />
+))
 export const CardHeader = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3', className)} {...p} />
 )

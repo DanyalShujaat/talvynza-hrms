@@ -1,6 +1,6 @@
 import { Banknote, Download, ExternalLink, Info, Landmark, Plus, Printer, Receipt, ShieldCheck, Wallet } from 'lucide-react'
 import * as React from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge, Card, CardBody, CardHeader, CardTitle, EmptyState, ErrorState, Notice, PageHeader, Skeleton } from '@/components/ui/card'
@@ -14,7 +14,7 @@ import { cn, formatDate } from '@/lib/utils'
 import { SalaryTemplates } from './salary-templates'
 
 interface Run { id: string; period_start: string; period_end: string; proration: string; status: string; currency: string; total_gross: string; total_deductions: string; total_net: string; statutory_status: string; statutory_notice: string; finalized_at: string | null }
-interface Entry { id: string; employee: string; employee_code: string; department: string | null; gross: string; deductions: string; net: string; income_tax: string; unpaid_days: string; exceptions: string[] }
+interface Entry { id: string; employee_id: string; employee: string; employee_code: string; department: string | null; gross: string; deductions: string; net: string; income_tax: string; unpaid_days: string; exceptions: string[] }
 interface RunDetail extends Run { entries: Entry[]; total_income_tax: string; total_employer_contributions: string }
 interface Line { name: string; amount: string }
 export interface Slip { organization: string; employee: string; employee_code: string; department: string | null; designation: string | null; joining_date: string; period_start: string; period_end: string; currency: string; gross: string; deductions: string; net: string; taxable_income: string; income_tax: string; unpaid_days: string; status: string; earnings: Line[]; deduction_lines: Line[]; employer_contributions: Line[]; statutory_notice: string }
@@ -102,7 +102,7 @@ function Runs() {
   return (
     <Card>
       <DataTable rows={q.data} rowKey={(r) => r.id} query={q} empty="No payroll runs yet" emptyHint="Add salaries to employees, then create the first run." emptyIcon={Wallet} onRowClick={(r) => nav(`/payroll/runs/${r.id}`)} cols={[
-        { header: 'Pay period', cell: (r) => <span className="font-semibold">{monthOf(r)}</span> },
+        { header: 'Pay period', cell: (r) => <Link className="font-semibold text-primary hover:underline" to={`/payroll/runs/${r.id}`}>{monthOf(r)}</Link> },
         { header: 'Status', cell: (r) => <StatusText status={r.status} /> },
         { header: 'Gross', right: true, cell: (r) => money(r.total_gross) },
         { header: 'Deductions', right: true, cell: (r) => money(r.total_deductions) },
@@ -215,11 +215,12 @@ export function PayrollPage() {
   if (p.has('salary.read')) tabs.push({ id: 'templates', label: 'Salary templates' })
   if (p.has('salary.read')) tabs.push({ id: 'components', label: 'Salary components' })
   if (p.has('payroll.read')) tabs.push({ id: 'statutory', label: 'Tax and statutory' })
-  const [tab, setTab] = React.useState<T>(tabs[0]?.id ?? 'runs')
+  const [sp, setSp] = useSearchParams()
+  const tab = tabs.find(t => t.id === sp.get('tab'))?.id ?? tabs[0]?.id ?? 'runs'
   return (
     <>
       <PageHeader title="Payroll" description="Pay runs, reusable salary templates, components and statutory deductions." actions={tab === 'runs' && p.has('payroll.process') ? <NewRunDialog /> : undefined} />
-      <Tabs tabs={tabs} value={tab} onChange={setTab} />
+      <Tabs tabs={tabs} value={tab} onChange={id => setSp({ tab: id }, { replace: true })} />
       {tab === 'runs' && <Runs />}{tab === 'templates' && <SalaryTemplates />}{tab === 'components' && <Components />}{tab === 'statutory' && <StatutorySettings />}
     </>
   )
@@ -247,9 +248,10 @@ export function PayrollRunPage() {
   const go = (fn: { mutate: (v: never) => void }) => fn.mutate(undefined as never)
   const step = STEPS.indexOf(r.status)
   const changed = (variance.data ?? []).filter((v) => v.previous_net)
+  const employeeTab = p.has('salary.read') ? 'salary' : 'payslips'
   return (
     <>
-      <PageHeader title={`Payroll for ${monthOf(r)}`} description={<Link to="/payroll" className="text-primary hover:underline">Back to all runs</Link>} actions={<>
+      <PageHeader title={`Payroll for ${monthOf(r)}`} description={<Link to="/payroll?tab=runs" className="text-primary hover:underline">Back to all runs</Link>} actions={<>
         {p.has('payroll.process') && ['draft', 'calculated'].includes(r.status) && <ConfirmButton variant="ghost" size="md" label="Delete run" title="Delete this run?" message="Its calculated figures are discarded. Loan installments and expense claims it picked up are released." confirmLabel="Delete run" onConfirm={() => go(del)} />}
         {p.has('payroll.process') && ['draft', 'calculated'].includes(r.status) && <Button variant={r.status === 'draft' ? 'primary' : 'outline'} loading={calc.isPending} onClick={() => go(calc)}>{r.status === 'draft' ? 'Calculate' : 'Recalculate'}</Button>}
         {p.has('payroll.approve') && r.status === 'calculated' && <ConfirmButton variant="primary" size="md" label="Approve" title="Approve this payroll?" message="Approval locks the figures. The person who created a run cannot approve it." confirmLabel="Approve" onConfirm={() => go(approve)} loading={approve.isPending} />}
@@ -281,12 +283,15 @@ export function PayrollRunPage() {
       <Card className="mb-6">
         <CardHeader><CardTitle>Employees</CardTitle></CardHeader>
         <DataTable rows={r.entries} rowKey={(e) => e.id} empty="No entries yet" emptyHint="Calculate the run to generate an entry for each employee with a salary." emptyIcon={Wallet} onRowClick={(e) => setSlip(`/payroll/runs/${r.id}/entries/${e.id}`)} cols={[
-          { header: 'Employee', cell: (e) => <div><Person name={e.employee} sub={[e.employee_code, e.department].filter(Boolean).join(' · ')} size="sm" />{e.exceptions.map((x) => <Badge key={x} tone="danger" className="ml-9 mt-1">{x.replace(/_/g, ' ')}</Badge>)}</div> },
+          { header: 'Employee', cell: (e) => {
+            const person = <Person name={e.employee} sub={[e.employee_code, e.department].filter(Boolean).join(' · ')} size="sm" />
+            return <div>{p.has('employees.read') ? <Link className="inline-block text-primary hover:underline" to={`/employees/${e.employee_id}?tab=${employeeTab}`} state={{ profileBack: { to: `/payroll/runs/${r.id}`, label: 'Payroll run' } }}>{person}</Link> : person}{e.exceptions.map((x) => <Badge key={x} tone="danger" className="ml-9 mt-1">{x.replace(/_/g, ' ')}</Badge>)}</div>
+          } },
           { header: 'Gross', right: true, cell: (e) => money(e.gross) },
           { header: 'Income tax', right: true, cell: (e) => (Number(e.income_tax) ? money(e.income_tax) : <span className="text-subtle">Nil</span>) },
           { header: 'Deductions', right: true, cell: (e) => money(e.deductions) },
           { header: 'Net pay', right: true, cell: (e) => <span className="font-semibold">{money(e.net)}</span> },
-          { header: '', right: true, cell: () => <span className="text-[13px] font-medium text-primary">Payslip</span> },
+          { header: '', right: true, cell: (e) => <Button variant="outline" size="sm" onClick={() => setSlip(`/payroll/runs/${r.id}/entries/${e.id}`)}>Payslip</Button> },
         ]} />
       </Card>
 
@@ -301,12 +306,22 @@ export function PayrollRunPage() {
 }
 
 export function PayslipsPage() {
-  const q = useGet<{ entry_id: string; period_start: string; period_end: string; gross: string; deductions: string; income_tax: string; net: string; currency: string }[]>('/payslips')
-  const [slip, setSlip] = React.useState<string | null>(null)
   return (
     <>
       <PageHeader title="My payslips" description="Published when payroll for a period is finalized." />
-      <Card><DataTable rows={q.data} rowKey={(s) => s.entry_id} query={q} empty="No payslips yet" emptyHint="Your payslip appears here once payroll for the month is finalized." emptyIcon={Receipt} onRowClick={(s) => setSlip(`/payslips/${s.entry_id}`)} cols={[
+      <EmployeePayslips />
+    </>
+  )
+}
+
+export function EmployeePayslips({ employeeId }: { employeeId?: string }) {
+  const q = useGet<{ entry_id: string; run_id: string; period_start: string; period_end: string; gross: string; deductions: string; income_tax: string; net: string; currency: string }[]>(
+    employeeId ? `/employees/${employeeId}/payslips` : '/payslips',
+  )
+  const [slip, setSlip] = React.useState<string | null>(null)
+  return (
+    <>
+      <Card><DataTable rows={q.data} rowKey={(s) => s.entry_id} query={q} empty="No payslips yet" emptyHint="Payslips appear here after payroll is finalized." emptyIcon={Receipt} onRowClick={(s) => setSlip(employeeId ? `/payroll/runs/${s.run_id}/entries/${s.entry_id}` : `/payslips/${s.entry_id}`)} cols={[
         { header: 'Pay period', cell: (s) => <span className="font-semibold">{monthOf(s)}</span> },
         { header: 'Gross', right: true, cell: (s) => money(s.gross) },
         { header: 'Income tax', right: true, cell: (s) => (Number(s.income_tax) ? money(s.income_tax) : 'Nil') },

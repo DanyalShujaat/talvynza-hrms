@@ -1,3 +1,4 @@
+import { useViewQuery, useViewTab } from '@/lib/view-state'
 import { Download, ExternalLink, Plus } from 'lucide-react'
 import * as React from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
@@ -12,6 +13,7 @@ import { today, uploadFile, useGet, useSend } from '@/lib/hooks'
 import { useMe } from '@/lib/queries'
 import { formatDate } from '@/lib/utils'
 import { Opts, useOrgLists } from '@/modules/people/employees'
+import { EmployeeSetup } from '@/modules/people/employee-setup'
 
 interface Job { id: string; title: string; status: string; openings: number; applicants: number; description: string | null; branch_id: string | null; department_id: string | null; designation_id: string | null }
 interface App { id: string; job_id: string; full_name: string | null; email: string | null; phone: string | null; has_resume: boolean; stage: string; cover_note: string | null; employee_id: string | null; source: string | null; created_at: string }
@@ -97,27 +99,49 @@ function InterviewDialog({ app, canManage, onClose }: { app: App | null; canMana
 
 function CandidateDetailDialog({ app, job, canHire, onClose, onInterview, onHire }: { app: App | null; job?: Job; canHire: boolean; onClose: () => void; onInterview: () => void; onHire: () => void }) {
   return <Dialog open={!!app} onOpenChange={open => !open && onClose()}><DialogContent title={app?.full_name ?? 'Candidate'} description={job ? `Applied for ${job.title}` : undefined}>
-    {app && <div className="space-y-4"><div className="flex flex-wrap items-center gap-2"><StatusText status={app.stage} /><span className="text-xs text-muted">Applied {formatDate(app.created_at, { dateStyle: 'medium' })}</span></div><dl className="grid gap-3 rounded-lg bg-surface-2 p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs text-muted">Email</dt><dd className="font-medium">{app.email ?? '—'}</dd></div><div><dt className="text-xs text-muted">Phone</dt><dd className="font-medium">{app.phone ?? '—'}</dd></div><div><dt className="text-xs text-muted">Source</dt><dd className="font-medium capitalize">{app.source?.replaceAll('_', ' ') ?? '—'}</dd></div><div><dt className="text-xs text-muted">Vacancy</dt><dd className="font-medium">{job?.title ?? 'Unknown'}</dd></div></dl>{app.cover_note && <div><h3 className="text-sm font-semibold">Cover note</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted">{app.cover_note}</p></div>}<div className="flex flex-wrap gap-2 border-t border-border pt-4">{app.has_resume && <Button asChild variant="outline" size="sm"><a href={`/api/v1/recruitment/applications/${app.id}/resume`}><Download className="h-4 w-4" />Download CV</a></Button>}<Button variant="outline" size="sm" onClick={onInterview}>Interviews</Button>{app.employee_id ? <Button asChild size="sm"><Link to={`/employees/${app.employee_id}?tab=checklist`}>Open onboarding</Link></Button> : canHire && app.stage !== 'Rejected' && <Button size="sm" onClick={onHire}>Hire candidate</Button>}</div></div>}
+    {app && <div className="space-y-4"><div className="flex flex-wrap items-center gap-2"><StatusText status={app.stage} /><span className="text-xs text-muted">Applied {formatDate(app.created_at, { dateStyle: 'medium' })}</span></div><dl className="grid gap-3 rounded-lg bg-surface-2 p-4 text-sm sm:grid-cols-2"><div><dt className="text-xs text-muted">Email</dt><dd className="font-medium">{app.email ?? '-'}</dd></div><div><dt className="text-xs text-muted">Phone</dt><dd className="font-medium">{app.phone ?? '-'}</dd></div><div><dt className="text-xs text-muted">Source</dt><dd className="font-medium capitalize">{app.source?.replaceAll('_', ' ') ?? '-'}</dd></div><div><dt className="text-xs text-muted">Vacancy</dt><dd className="font-medium">{job?.title ?? 'Unknown'}</dd></div></dl>{app.cover_note && <div><h3 className="text-sm font-semibold">Cover note</h3><p className="mt-1 whitespace-pre-wrap text-sm text-muted">{app.cover_note}</p></div>}<div className="flex flex-wrap gap-2 border-t border-border pt-4">{app.has_resume && <Button asChild variant="outline" size="sm"><a href={`/api/v1/recruitment/applications/${app.id}/resume`}><Download className="h-4 w-4" />Download CV</a></Button>}<Button variant="outline" size="sm" onClick={onInterview}>Interviews</Button>{app.employee_id ? <Button asChild size="sm"><Link to={`/employees/${app.employee_id}?tab=checklist`}>Open onboarding</Link></Button> : canHire && app.stage !== 'Rejected' && <Button size="sm" onClick={onHire}>Hire candidate</Button>}</div></div>}
   </DialogContent></Dialog>
 }
 
 function HireDialog({ app, job, onClose }: { app: App | null; job?: Job; onClose: () => void }) {
   const navigate = useNavigate()
   const { branches, departments, designations } = useOrgLists()
+  const activeBranches = branches.filter(b => b.is_active)
+  const activeDepartments = departments.filter(d => d.is_active)
   const managers = useGet<{ items: { id: string; full_name: string }[] }>('/employees', { status: 'active', page_size: 100 }, !!app)
   const [date, setDate] = React.useState(today())
   const [placement, setPlacement] = React.useState({ branch_id: '', department_id: '', designation_id: '', manager_id: '' })
   React.useEffect(() => { if (app) setPlacement({ branch_id: job?.branch_id ?? '', department_id: job?.department_id ?? '', designation_id: job?.designation_id ?? '', manager_id: '' }) }, [app?.id, job?.id])
+  const validPlacement = activeBranches.some(b => b.id === placement.branch_id)
+    && activeDepartments.some(d => d.id === placement.department_id)
   const m = useSend<{ joining_date: string; branch_id: string | null; department_id: string | null; designation_id: string | null; manager_id: string | null }, { employee_id: string; employee_code: string }>('POST', `/recruitment/applications/${app?.id}/hire`, { invalidate: ['/recruitment', '/employees', '/checklists', '/dashboard'], onSuccess: (r) => { toast.success(`Employee ${r.employee_code} created. Complete the onboarding checklist.`); onClose(); navigate(`/employees/${r.employee_id}?tab=checklist`) } })
   return (
     <Dialog open={!!app} onOpenChange={(o) => !o && onClose()}>
       <DialogContent title={`Hire ${app?.full_name ?? ''}`} description="Create the employee record, assign its reporting line, and start onboarding.">
-        <div className="space-y-3">
-          <Field id="h-d" label="Joining date">{(a) => <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} {...a} />}</Field>
-          <div className="grid gap-3 sm:grid-cols-2"><Field id="h-branch" label="Branch">{a => <Select {...a} value={placement.branch_id} onChange={e => setPlacement({ ...placement, branch_id: e.target.value })}><Opts list={branches} /></Select>}</Field><Field id="h-dept" label="Department">{a => <Select {...a} value={placement.department_id} onChange={e => setPlacement({ ...placement, department_id: e.target.value, designation_id: '' })}><Opts list={departments} /></Select>}</Field><Field id="h-desig" label="Designation">{a => <Select {...a} value={placement.designation_id} onChange={e => setPlacement({ ...placement, designation_id: e.target.value })}><Opts list={designations.filter(d => !placement.department_id || !d.department_id || d.department_id === placement.department_id)} /></Select>}</Field><Field id="h-manager" label="Reporting manager">{a => <Select {...a} value={placement.manager_id} onChange={e => setPlacement({ ...placement, manager_id: e.target.value })}><Opts list={(managers.data?.items ?? []).map(p => ({ id: p.id, name: p.full_name }))} /></Select>}</Field></div>
-          <p className="rounded-lg bg-primary-soft p-3 text-xs text-muted">Next: collect documents, assign equipment, set up access, and finish the onboarding checklist in the employee profile.</p>
-          <div className="flex justify-end gap-2"><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose><Button loading={m.isPending} onClick={() => m.mutate({ joining_date: date, branch_id: placement.branch_id || null, department_id: placement.department_id || null, designation_id: placement.designation_id || null, manager_id: placement.manager_id || null })}>Create employee</Button></div>
-        </div>
+        {app && (
+          <EmployeeSetup>
+            <div className="space-y-3">
+              <Field id="h-d" label="Joining date">{(a) => <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} {...a} />}</Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field id="h-branch" label="Branch">{a => <Select {...a} required value={placement.branch_id} onChange={e => setPlacement({ ...placement, branch_id: e.target.value })}><Opts list={activeBranches} blank="Select a branch" /></Select>}</Field>
+                <Field id="h-dept" label="Department">{a => <Select {...a} required value={placement.department_id} onChange={e => setPlacement({ ...placement, department_id: e.target.value, designation_id: '' })}><Opts list={activeDepartments} blank="Select a department" /></Select>}</Field>
+                <Field id="h-desig" label="Designation">{a => <Select {...a} value={placement.designation_id} onChange={e => setPlacement({ ...placement, designation_id: e.target.value })}><Opts list={designations.filter(d => !placement.department_id || !d.department_id || d.department_id === placement.department_id)} /></Select>}</Field>
+                <Field id="h-manager" label="Reporting manager">{a => <Select {...a} value={placement.manager_id} onChange={e => setPlacement({ ...placement, manager_id: e.target.value })}><Opts list={(managers.data?.items ?? []).map(p => ({ id: p.id, name: p.full_name }))} /></Select>}</Field>
+              </div>
+              <p className="rounded-lg bg-primary-soft p-3 text-xs text-muted">After hiring, use the onboarding checklist to collect documents, assign equipment and set up access.</p>
+              <div className="flex justify-end gap-2">
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button disabled={!date || !validPlacement} loading={m.isPending} onClick={() => m.mutate({
+                  joining_date: date,
+                  branch_id: placement.branch_id,
+                  department_id: placement.department_id,
+                  designation_id: placement.designation_id || null,
+                  manager_id: placement.manager_id || null,
+                })}>Create employee</Button>
+              </div>
+            </div>
+          </EmployeeSetup>
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -143,11 +167,12 @@ export function HirePage() {
   const manage = me?.permissions.includes('recruitment.manage')
   const jobs = useGet<Job[]>('/recruitment/jobs')
   const stages = useGet<{ stages: string[] }>('/recruitment/pipeline')
-  const [jobId, setJobId] = React.useState('')
-  const [view, setView] = React.useState<'vacancies' | 'talent' | 'reports'>('vacancies')
-  const [search, setSearch] = React.useState('')
-  const [reportStage, setReportStage] = React.useState('')
-  const [reportJob, setReportJob] = React.useState('')
+  const [params, update] = useViewQuery()
+  const [view, setView] = useViewTab(['vacancies', 'talent', 'reports'] as const, 'vacancies')
+  const jobId = params.get('job_id') ?? ''
+  const search = params.get('q') ?? ''
+  const reportStage = params.get('stage') ?? ''
+  const reportJob = params.get('report_job') ?? ''
   const [newJob, setNewJob] = React.useState(false)
   const [interview, setInterview] = React.useState<App | null>(null)
   const [hire, setHire] = React.useState<App | null>(null)
@@ -166,13 +191,13 @@ export function HirePage() {
       <PageHeader title="Hire" description="Vacancies, applicants and hiring reports in one place." actions={manage ? <><CareerSettingsDialog /><Button onClick={() => setNewJob(true)}><Plus className="h-4 w-4" />New job</Button></> : undefined} />
       <Tabs tabs={[{ id: 'vacancies', label: 'Vacancies and pipeline' }, { id: 'talent', label: 'Talent pool' }, { id: 'reports', label: 'Reports' }]} value={view} onChange={setView} />
       {view === 'reports' && <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{cols.map(stage => <Card key={stage}><CardBody className="py-4"><p className="text-xs font-medium text-muted">{stage}</p><p className="mt-1 font-display text-2xl font-bold">{(allApps.data ?? []).filter(a => a.stage === stage).length}</p></CardBody></Card>)}</div>}
-      {view !== 'vacancies' && <Card className="mb-5"><CardBody className="flex flex-wrap items-center gap-3"><Input aria-label="Search candidates" placeholder="Search candidates" className="max-w-xs" value={search} onChange={e => setSearch(e.target.value)} />{view === 'reports' && <><Select aria-label="Report stage" className="w-40" value={reportStage} onChange={e => setReportStage(e.target.value)}><option value="">All stages</option>{cols.map(c => <option key={c} value={c}>{c}</option>)}</Select><Select aria-label="Report vacancy" className="w-52" value={reportJob} onChange={e => setReportJob(e.target.value)}><option value="">All vacancies</option>{jobs.data?.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}</Select></>}<span className="text-sm text-muted">{reportApps.length} candidates</span><Button variant="outline" className="ml-auto" disabled={!reportApps.length} onClick={() => downloadCsv('recruitment-report.csv', [['Candidate', 'Email', 'Phone', 'Vacancy', 'Stage', 'Source'], ...reportApps.map(a => [a.full_name, a.email, a.phone, jobs.data?.find(j => j.id === a.job_id)?.title, a.stage, a.source])])}><Download className="h-4 w-4" />Export CSV</Button></CardBody></Card>}
+      {view !== 'vacancies' && <Card className="mb-5"><CardBody className="flex flex-wrap items-center gap-3"><Input aria-label="Search candidates" placeholder="Search candidates" className="max-w-xs" value={search} onChange={e => update({ q: e.target.value })} />{view === 'reports' && <><Select aria-label="Report stage" className="w-40" value={reportStage} onChange={e => update({ stage: e.target.value })}><option value="">All stages</option>{cols.map(c => <option key={c} value={c}>{c}</option>)}</Select><Select aria-label="Report vacancy" className="w-52" value={reportJob} onChange={e => update({ report_job: e.target.value })}><option value="">All vacancies</option>{jobs.data?.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}</Select></>}<span className="text-sm text-muted">{reportApps.length} candidates</span><Button variant="outline" className="ml-auto" disabled={!reportApps.length} onClick={() => downloadCsv('recruitment-report.csv', [['Candidate', 'Email', 'Phone', 'Vacancy', 'Stage', 'Source'], ...reportApps.map(a => [a.full_name, a.email, a.phone, jobs.data?.find(j => j.id === a.job_id)?.title, a.stage, a.source])])}><Download className="h-4 w-4" />Export CSV</Button></CardBody></Card>}
       {view !== 'vacancies' && <Card className="mb-5"><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-surface-2 text-xs uppercase text-muted"><tr>{['Candidate', 'Vacancy', 'Stage', 'Email', 'Action'].map(h => <th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody className="divide-y divide-border">{reportApps.map(a => <tr key={a.id}><td className="px-4 py-3 font-medium">{a.full_name}</td><td className="px-4 py-3">{jobs.data?.find(j => j.id === a.job_id)?.title ?? 'Unknown'}</td><td className="px-4 py-3"><StatusText status={a.stage} /></td><td className="px-4 py-3">{a.email}</td><td className="px-4 py-3"><Button size="sm" variant="outline" onClick={() => setCandidate(a)}>View candidate</Button></td></tr>)}</tbody></table></div></Card>}
       {view === 'vacancies' && <>
       {jobs.isLoading ? <Skeleton className="h-40 w-full" /> : jobs.isError ? <ErrorState message={errorMessage(jobs.error)} onRetry={() => jobs.refetch()} /> : !jobs.data?.length ? <Card><EmptyState title="No jobs yet" description="Create a job, open it, and share your careers page." /></Card> : (
         <>
           <Card className="mb-5"><CardBody className="flex flex-wrap items-center gap-3">
-            <Select aria-label="Job" className="w-72" value={job?.id ?? ''} onChange={(e) => setJobId(e.target.value)}>{jobs.data.map((j) => <option key={j.id} value={j.id}>{j.title} ({j.applicants})</option>)}</Select>
+            <Select aria-label="Job" className="w-72" value={job?.id ?? ''} onChange={(e) => update({ job_id: e.target.value })}>{jobs.data.map((j) => <option key={j.id} value={j.id}>{j.title} ({j.applicants})</option>)}</Select>
             {job && <StatusText status={job.status} />}
             {manage && job && job.status !== 'open' && <Button size="sm" onClick={() => status.mutate({ stage: 'open' })}>Open job</Button>}
             {manage && job && job.status === 'open' && <Button size="sm" variant="outline" onClick={() => status.mutate({ stage: 'closed' })}>Close job</Button>}

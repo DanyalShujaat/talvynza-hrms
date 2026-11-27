@@ -1,8 +1,8 @@
 {
  "openapi": "3.1.0",
  "info": {
-  "title": "TALVYNZA HRMS API",
-  "version": "0.1.0"
+  "title": "Talvynza HRMS API",
+  "version": "0.2.0"
  },
  "paths": {
   "/api/v1/auth/register": {
@@ -134,6 +134,85 @@
       "application/json": {
        "schema": {
         "$ref": "#/components/schemas/LoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/invitation": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Invitation",
+    "operationId": "invitation_api_v1_auth_invitation_get",
+    "parameters": [
+     {
+      "name": "token",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Token"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/join": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Join",
+    "operationId": "join_api_v1_auth_join_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/JoinIn"
        }
       }
      },
@@ -448,6 +527,64 @@
     }
    }
   },
+  "/api/v1/demo/accounts": {
+   "get": {
+    "tags": [
+     "local demo"
+    ],
+    "summary": "List Accounts",
+    "operationId": "list_accounts_api_v1_demo_accounts_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/demo/login": {
+   "post": {
+    "tags": [
+     "local demo"
+    ],
+    "summary": "Demo Login",
+    "operationId": "demo_login_api_v1_demo_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DemoLogin"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/me": {
    "get": {
     "tags": [
@@ -611,6 +748,23 @@
     "operationId": "members_api_v1_members_get",
     "parameters": [
      {
+      "name": "membership_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Membership Id"
+      }
+     },
+     {
       "name": "page",
       "in": "query",
       "required": false,
@@ -693,6 +847,42 @@
         "schema": {}
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/members/{membership_id}": {
+   "delete": {
+    "tags": [
+     "organization"
+    ],
+    "summary": "Remove Member",
+    "operationId": "remove_member_api_v1_members__membership_id__delete",
+    "parameters": [
+     {
+      "name": "membership_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Membership Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -983,6 +1173,103 @@
     }
    }
   },
+  "/api/v1/assistant/status": {
+   "get": {
+    "tags": [
+     "assistant"
+    ],
+    "summary": "Status",
+    "operationId": "status_api_v1_assistant_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assistant/chat": {
+   "post": {
+    "tags": [
+     "assistant"
+    ],
+    "summary": "Chat",
+    "operationId": "chat_api_v1_assistant_chat_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChatIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assistant/confirm": {
+   "post": {
+    "tags": [
+     "assistant"
+    ],
+    "summary": "Confirm",
+    "operationId": "confirm_api_v1_assistant_confirm_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConfirmIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/branches": {
    "get": {
     "tags": [
@@ -1110,6 +1397,96 @@
     "responses": {
      "204": {
       "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/branches/{branch_id}/premises": {
+   "get": {
+    "tags": [
+     "organization"
+    ],
+    "summary": "Get Premises",
+    "operationId": "get_premises_api_v1_branches__branch_id__premises_get",
+    "parameters": [
+     {
+      "name": "branch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Branch Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "organization"
+    ],
+    "summary": "Update Premises",
+    "operationId": "update_premises_api_v1_branches__branch_id__premises_put",
+    "parameters": [
+     {
+      "name": "branch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Branch Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PremisesIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
      },
      "422": {
       "description": "Validation Error",
@@ -1751,6 +2128,25 @@
     }
    }
   },
+  "/api/v1/employees/setup": {
+   "get": {
+    "tags": [
+     "employees"
+    ],
+    "summary": "Employee Setup",
+    "operationId": "employee_setup_api_v1_employees_setup_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/employees/template.csv": {
    "get": {
     "tags": [
@@ -2102,6 +2498,58 @@
     ],
     "responses": {
      "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/employees/{employee_id}/invite": {
+   "post": {
+    "tags": [
+     "employees"
+    ],
+    "summary": "Invite To Portal",
+    "description": "Emails the employee a link to set a password and sign in. The login is linked to this record by email.",
+    "operationId": "invite_to_portal_api_v1_employees__employee_id__invite_post",
+    "parameters": [
+     {
+      "name": "employee_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PortalInviteIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
       "description": "Successful Response",
       "content": {
        "application/json": {
@@ -2703,6 +3151,47 @@
     }
    }
   },
+  "/api/v1/attendance/employees/{employee_id}/settings": {
+   "get": {
+    "tags": [
+     "attendance"
+    ],
+    "summary": "Employee Settings",
+    "operationId": "employee_settings_api_v1_attendance_employees__employee_id__settings_get",
+    "parameters": [
+     {
+      "name": "employee_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/attendance/today": {
    "get": {
     "tags": [
@@ -2760,6 +3249,98 @@
     }
    }
   },
+  "/api/v1/attendance/mobile/check-in": {
+   "post": {
+    "tags": [
+     "attendance"
+    ],
+    "summary": "Mobile Check In",
+    "operationId": "mobile_check_in_api_v1_attendance_mobile_check_in_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/MobilePunchIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/attendance/mobile/check-out": {
+   "post": {
+    "tags": [
+     "attendance"
+    ],
+    "summary": "Mobile Check Out",
+    "operationId": "mobile_check_out_api_v1_attendance_mobile_check_out_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/MobilePunchIn"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/attendance/me": {
    "get": {
     "tags": [
@@ -2796,6 +3377,133 @@
       }
      }
     ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/attendance/access": {
+   "get": {
+    "tags": [
+     "attendance"
+    ],
+    "summary": "Preview Access",
+    "operationId": "preview_access_api_v1_attendance_access_get",
+    "parameters": [
+     {
+      "name": "branch_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Branch Id"
+      }
+     },
+     {
+      "name": "department_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Department Id"
+      }
+     },
+     {
+      "name": "channel",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "web",
+        "mobile",
+        "premises"
+       ],
+       "type": "string",
+       "default": "web",
+       "title": "Channel"
+      }
+     },
+     {
+      "name": "all_employees",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "All Employees"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "attendance"
+    ],
+    "summary": "Update Access",
+    "operationId": "update_access_api_v1_attendance_access_patch",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AttendanceAccessIn"
+       }
+      }
+     }
+    },
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -2868,6 +3576,27 @@
         }
        ],
        "title": "Department Id"
+      }
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "default": 1,
+       "title": "Page"
+      }
+     },
+     {
+      "name": "paginated",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Paginated"
       }
      }
     ],
@@ -3270,7 +3999,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/AssignIn"
+        "$ref": "#/components/schemas/app__modules__attendance__router__AssignIn"
        }
       }
      },
@@ -3549,7 +4278,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/ApplyIn"
+        "$ref": "#/components/schemas/app__modules__leave__router__ApplyIn"
        }
       }
      }
@@ -3607,6 +4336,23 @@
         }
        ],
        "title": "Status"
+      }
+     },
+     {
+      "name": "employee_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
       }
      }
     ],
@@ -4090,6 +4836,23 @@
        "default": "mine",
        "title": "Scope"
       }
+     },
+     {
+      "name": "assignee_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Assignee Id"
+      }
      }
     ],
     "responses": {
@@ -4222,6 +4985,62 @@
     "responses": {
      "204": {
       "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/payroll/statutory": {
+   "get": {
+    "tags": [
+     "payroll"
+    ],
+    "summary": "Get Statutory",
+    "operationId": "get_statutory_api_v1_payroll_statutory_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "payroll"
+    ],
+    "summary": "Put Statutory",
+    "operationId": "put_statutory_api_v1_payroll_statutory_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StatutoryIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
      },
      "422": {
       "description": "Validation Error",
@@ -4881,6 +5700,47 @@
     }
    }
   },
+  "/api/v1/employees/{employee_id}/payslips": {
+   "get": {
+    "tags": [
+     "payroll"
+    ],
+    "summary": "Employee Payslips",
+    "operationId": "employee_payslips_api_v1_employees__employee_id__payslips_get",
+    "parameters": [
+     {
+      "name": "employee_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/v1/payslips/{entry_id}": {
    "get": {
     "tags": [
@@ -4900,6 +5760,239 @@
       }
      }
     ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/payroll/templates": {
+   "get": {
+    "tags": [
+     "payroll templates"
+    ],
+    "summary": "List Templates",
+    "operationId": "list_templates_api_v1_payroll_templates_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "payroll templates"
+    ],
+    "summary": "Create Template",
+    "operationId": "create_template_api_v1_payroll_templates_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TemplateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/payroll/templates/{template_id}": {
+   "put": {
+    "tags": [
+     "payroll templates"
+    ],
+    "summary": "Update Template",
+    "operationId": "update_template_api_v1_payroll_templates__template_id__put",
+    "parameters": [
+     {
+      "name": "template_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Template Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TemplateIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/payroll/salary-roster": {
+   "get": {
+    "tags": [
+     "payroll templates"
+    ],
+    "summary": "Salary Roster",
+    "operationId": "salary_roster_api_v1_payroll_salary_roster_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/payroll/templates/{template_id}/apply": {
+   "post": {
+    "tags": [
+     "payroll templates"
+    ],
+    "summary": "Apply Template",
+    "operationId": "apply_template_api_v1_payroll_templates__template_id__apply_post",
+    "parameters": [
+     {
+      "name": "template_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Template Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/app__modules__payroll__templates__ApplyIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/recruitment/career-settings": {
+   "get": {
+    "tags": [
+     "recruitment"
+    ],
+    "summary": "Get Career Settings",
+    "operationId": "get_career_settings_api_v1_recruitment_career_settings_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "recruitment"
+    ],
+    "summary": "Set Career Settings",
+    "operationId": "set_career_settings_api_v1_recruitment_career_settings_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CareerSettingsIn"
+       }
+      }
+     },
+     "required": true
+    },
     "responses": {
      "200": {
       "description": "Successful Response",
@@ -5574,6 +6667,2803 @@
     }
    }
   },
+  "/api/v1/expenses/categories": {
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Categories",
+    "operationId": "categories_api_v1_expenses_categories_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Create Category",
+    "operationId": "create_category_api_v1_expenses_categories_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CategoryIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/categories/{category_id}": {
+   "put": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Update Category",
+    "operationId": "update_category_api_v1_expenses_categories__category_id__put",
+    "parameters": [
+     {
+      "name": "category_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Category Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CategoryIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses": {
+   "post": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Submit",
+    "operationId": "submit_api_v1_expenses_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_submit_api_v1_expenses_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "List Claims",
+    "operationId": "list_claims_api_v1_expenses_get",
+    "parameters": [
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(mine|team|all)$",
+       "default": "mine",
+       "title": "Scope"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "employee_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/{claim_id}/manager-decision": {
+   "post": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Manager Decision",
+    "operationId": "manager_decision_api_v1_expenses__claim_id__manager_decision_post",
+    "parameters": [
+     {
+      "name": "claim_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Claim Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecisionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/{claim_id}/finance-decision": {
+   "post": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Finance Decision",
+    "operationId": "finance_decision_api_v1_expenses__claim_id__finance_decision_post",
+    "parameters": [
+     {
+      "name": "claim_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Claim Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FinanceDecisionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/{claim_id}/reimburse": {
+   "post": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Reimburse",
+    "description": "Marks a directly paid claim as reimbursed. Claims paid through payroll are settled when the run is finalized.",
+    "operationId": "reimburse_api_v1_expenses__claim_id__reimburse_post",
+    "parameters": [
+     {
+      "name": "claim_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Claim Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/{claim_id}/cancel": {
+   "post": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Cancel",
+    "operationId": "cancel_api_v1_expenses__claim_id__cancel_post",
+    "parameters": [
+     {
+      "name": "claim_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Claim Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/expenses/{claim_id}/receipt": {
+   "get": {
+    "tags": [
+     "expenses"
+    ],
+    "summary": "Receipt",
+    "operationId": "receipt_api_v1_expenses__claim_id__receipt_get",
+    "parameters": [
+     {
+      "name": "claim_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Claim Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/loans": {
+   "post": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "Request Loan",
+    "operationId": "request_loan_api_v1_loans_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoanIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "List Loans",
+    "operationId": "list_loans_api_v1_loans_get",
+    "parameters": [
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(mine|all)$",
+       "default": "mine",
+       "title": "Scope"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "employee_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/loans/{loan_id}": {
+   "get": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "Get Loan",
+    "operationId": "get_loan_api_v1_loans__loan_id__get",
+    "parameters": [
+     {
+      "name": "loan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Loan Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/loans/{loan_id}/decision": {
+   "post": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "Decide",
+    "operationId": "decide_api_v1_loans__loan_id__decision_post",
+    "parameters": [
+     {
+      "name": "loan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Loan Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DecisionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/loans/{loan_id}/disburse": {
+   "post": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "Disburse",
+    "operationId": "disburse_api_v1_loans__loan_id__disburse_post",
+    "parameters": [
+     {
+      "name": "loan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Loan Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DisburseIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/loans/{loan_id}/repay": {
+   "post": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "Repay",
+    "description": "Records a repayment made outside payroll, for chosen installments or the whole balance.",
+    "operationId": "repay_api_v1_loans__loan_id__repay_post",
+    "parameters": [
+     {
+      "name": "loan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Loan Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RepayIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/loans/{loan_id}/cancel": {
+   "post": {
+    "tags": [
+     "loans"
+    ],
+    "summary": "Cancel",
+    "operationId": "cancel_api_v1_loans__loan_id__cancel_post",
+    "parameters": [
+     {
+      "name": "loan_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Loan Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assets": {
+   "get": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "List Assets",
+    "operationId": "list_assets_api_v1_assets_get",
+    "parameters": [
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "holder_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Holder Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "Create Asset",
+    "operationId": "create_asset_api_v1_assets_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssetIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assets/{asset_id}": {
+   "put": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "Update Asset",
+    "operationId": "update_asset_api_v1_assets__asset_id__put",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssetIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assets/{asset_id}/status": {
+   "post": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "Set Status",
+    "operationId": "set_status_api_v1_assets__asset_id__status_post",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StatusIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assets/{asset_id}/assign": {
+   "post": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "Assign",
+    "operationId": "assign_api_v1_assets__asset_id__assign_post",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/app__modules__assets__router__AssignIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assets/{asset_id}/return": {
+   "post": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "Return Asset",
+    "operationId": "return_asset_api_v1_assets__asset_id__return_post",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReturnIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/assets/{asset_id}/history": {
+   "get": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "History",
+    "operationId": "history_api_v1_assets__asset_id__history_get",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/me/assets": {
+   "get": {
+    "tags": [
+     "assets"
+    ],
+    "summary": "My Assets",
+    "operationId": "my_assets_api_v1_me_assets_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/tickets/categories": {
+   "get": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Categories",
+    "operationId": "categories_api_v1_tickets_categories_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/tickets": {
+   "post": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Create",
+    "operationId": "create_api_v1_tickets_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TicketIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "List Tickets",
+    "operationId": "list_tickets_api_v1_tickets_get",
+    "parameters": [
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(mine|all)$",
+       "default": "mine",
+       "title": "Scope"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/tickets/{ticket_id}": {
+   "get": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Get Ticket",
+    "operationId": "get_ticket_api_v1_tickets__ticket_id__get",
+    "parameters": [
+     {
+      "name": "ticket_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Ticket Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Update",
+    "operationId": "update_api_v1_tickets__ticket_id__patch",
+    "parameters": [
+     {
+      "name": "ticket_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Ticket Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TicketPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/tickets/{ticket_id}/comments": {
+   "post": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Comment",
+    "operationId": "comment_api_v1_tickets__ticket_id__comments_post",
+    "parameters": [
+     {
+      "name": "ticket_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Ticket Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CommentIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/tickets/{ticket_id}/close": {
+   "post": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Close",
+    "operationId": "close_api_v1_tickets__ticket_id__close_post",
+    "parameters": [
+     {
+      "name": "ticket_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Ticket Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/tickets/{ticket_id}/rating": {
+   "post": {
+    "tags": [
+     "help desk"
+    ],
+    "summary": "Rate",
+    "operationId": "rate_api_v1_tickets__ticket_id__rating_post",
+    "parameters": [
+     {
+      "name": "ticket_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Ticket Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RatingIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/goals": {
+   "get": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "List Goals",
+    "operationId": "list_goals_api_v1_goals_get",
+    "parameters": [
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(mine|team|all)$",
+       "default": "mine",
+       "title": "Scope"
+      }
+     },
+     {
+      "name": "employee_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Create Goal",
+    "operationId": "create_goal_api_v1_goals_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GoalIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/goals/{goal_id}": {
+   "patch": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Update Goal",
+    "operationId": "update_goal_api_v1_goals__goal_id__patch",
+    "parameters": [
+     {
+      "name": "goal_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Goal Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/GoalPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Delete Goal",
+    "operationId": "delete_goal_api_v1_goals__goal_id__delete",
+    "parameters": [
+     {
+      "name": "goal_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Goal Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/review-cycles": {
+   "get": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "List Cycles",
+    "operationId": "list_cycles_api_v1_review_cycles_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Create Cycle",
+    "operationId": "create_cycle_api_v1_review_cycles_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CycleIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/review-cycles/{cycle_id}/launch": {
+   "post": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Launch",
+    "description": "Creates one review per current employee. The reviewer is the employee's manager at launch.",
+    "operationId": "launch_api_v1_review_cycles__cycle_id__launch_post",
+    "parameters": [
+     {
+      "name": "cycle_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Cycle Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/review-cycles/{cycle_id}/close": {
+   "post": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Close Cycle",
+    "operationId": "close_cycle_api_v1_review_cycles__cycle_id__close_post",
+    "parameters": [
+     {
+      "name": "cycle_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Cycle Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reviews": {
+   "get": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "List Reviews",
+    "operationId": "list_reviews_api_v1_reviews_get",
+    "parameters": [
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(mine|team|all)$",
+       "default": "mine",
+       "title": "Scope"
+      }
+     },
+     {
+      "name": "cycle_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Cycle Id"
+      }
+     },
+     {
+      "name": "employee_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Employee Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reviews/{review_id}/self": {
+   "post": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Self Assessment",
+    "operationId": "self_assessment_api_v1_reviews__review_id__self_post",
+    "parameters": [
+     {
+      "name": "review_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Review Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssessmentIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reviews/{review_id}/manager": {
+   "post": {
+    "tags": [
+     "performance"
+    ],
+    "summary": "Manager Assessment",
+    "operationId": "manager_assessment_api_v1_reviews__review_id__manager_post",
+    "parameters": [
+     {
+      "name": "review_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Review Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AssessmentIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/courses": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "List Courses",
+    "operationId": "list_courses_api_v1_courses_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Create Course",
+    "operationId": "create_course_api_v1_courses_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CourseIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/courses/{course_id}": {
+   "put": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Update Course",
+    "operationId": "update_course_api_v1_courses__course_id__put",
+    "parameters": [
+     {
+      "name": "course_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Course Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CourseIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/courses/{course_id}/assign": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Assign",
+    "operationId": "assign_api_v1_courses__course_id__assign_post",
+    "parameters": [
+     {
+      "name": "course_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Course Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/app__modules__training__router__AssignIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/courses/{course_id}/enroll": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Self Enroll",
+    "operationId": "self_enroll_api_v1_courses__course_id__enroll_post",
+    "parameters": [
+     {
+      "name": "course_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Course Id"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/enrollments": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "List Enrollments",
+    "operationId": "list_enrollments_api_v1_enrollments_get",
+    "parameters": [
+     {
+      "name": "scope",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "pattern": "^(mine|all)$",
+       "default": "mine",
+       "title": "Scope"
+      }
+     },
+     {
+      "name": "course_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Course Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/enrollments/{enrollment_id}": {
+   "patch": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Update Enrollment",
+    "operationId": "update_enrollment_api_v1_enrollments__enrollment_id__patch",
+    "parameters": [
+     {
+      "name": "enrollment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Enrollment Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EnrollmentPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/offboarding": {
+   "get": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "List All",
+    "operationId": "list_all_api_v1_offboarding_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Start",
+    "operationId": "start_api_v1_offboarding_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StartIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/offboarding/{off_id}": {
+   "get": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Detail",
+    "operationId": "detail_api_v1_offboarding__off_id__get",
+    "parameters": [
+     {
+      "name": "off_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Off Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Patch",
+    "operationId": "patch_api_v1_offboarding__off_id__patch",
+    "parameters": [
+     {
+      "name": "off_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Off Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PatchIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/offboarding/{off_id}/items": {
+   "post": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Add Item",
+    "operationId": "add_item_api_v1_offboarding__off_id__items_post",
+    "parameters": [
+     {
+      "name": "off_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Off Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ItemIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/offboarding/{off_id}/items/{item_id}": {
+   "patch": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Toggle Item",
+    "operationId": "toggle_item_api_v1_offboarding__off_id__items__item_id__patch",
+    "parameters": [
+     {
+      "name": "off_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Off Id"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ItemPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/offboarding/{off_id}/cancel": {
+   "post": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Cancel",
+    "operationId": "cancel_api_v1_offboarding__off_id__cancel_post",
+    "parameters": [
+     {
+      "name": "off_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Off Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/offboarding/{off_id}/complete": {
+   "post": {
+    "tags": [
+     "offboarding"
+    ],
+    "summary": "Complete",
+    "description": "Closes the exit: every clearance item done, assets back, loans cleared. Then the employee record is marked as\nleft on the last working day and their access to this organization is revoked.",
+    "operationId": "complete_api_v1_offboarding__off_id__complete_post",
+    "parameters": [
+     {
+      "name": "off_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Off Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reports/headcount": {
+   "get": {
+    "tags": [
+     "reports"
+    ],
+    "summary": "Headcount",
+    "operationId": "headcount_api_v1_reports_headcount_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reports/attendance": {
+   "get": {
+    "tags": [
+     "reports"
+    ],
+    "summary": "Attendance",
+    "operationId": "attendance_api_v1_reports_attendance_get",
+    "parameters": [
+     {
+      "name": "month",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^\\d{4}-\\d{2}$",
+       "title": "Month"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reports/leave": {
+   "get": {
+    "tags": [
+     "reports"
+    ],
+    "summary": "Leave",
+    "operationId": "leave_api_v1_reports_leave_get",
+    "parameters": [
+     {
+      "name": "year",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "maximum": 2100,
+       "minimum": 2000,
+       "title": "Year"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/reports/payroll": {
+   "get": {
+    "tags": [
+     "reports"
+    ],
+    "summary": "Payroll",
+    "operationId": "payroll_api_v1_reports_payroll_get",
+    "parameters": [
+     {
+      "name": "year",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "maximum": 2100,
+       "minimum": 2000,
+       "title": "Year"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/health": {
    "get": {
     "tags": [
@@ -5716,41 +9606,109 @@
     ],
     "title": "AdjustmentIn"
    },
-   "ApplyIn": {
+   "AssessmentIn": {
     "properties": {
-     "leave_type_id": {
+     "rating": {
+      "type": "integer",
+      "maximum": 5.0,
+      "minimum": 1.0,
+      "title": "Rating"
+     },
+     "comment": {
       "type": "string",
-      "format": "uuid",
-      "title": "Leave Type Id"
-     },
-     "start_date": {
+      "maxLength": 5000,
+      "minLength": 3,
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rating",
+     "comment"
+    ],
+    "title": "AssessmentIn"
+   },
+   "AssetIn": {
+    "properties": {
+     "name": {
       "type": "string",
-      "format": "date",
-      "title": "Start Date"
+      "maxLength": 160,
+      "minLength": 2,
+      "title": "Name"
      },
-     "end_date": {
+     "category": {
       "type": "string",
-      "format": "date",
-      "title": "End Date"
+      "maxLength": 60,
+      "minLength": 2,
+      "title": "Category"
      },
-     "half_day": {
-      "type": "boolean",
-      "title": "Half Day",
-      "default": false
-     },
-     "reason": {
+     "serial_number": {
       "anyOf": [
        {
         "type": "string",
-        "maxLength": 1000
+        "maxLength": 80
        },
        {
         "type": "null"
        }
       ],
-      "title": "Reason"
+      "title": "Serial Number"
      },
-     "employee_id": {
+     "condition": {
+      "type": "string",
+      "pattern": "^(new|good|fair|damaged)$",
+      "title": "Condition",
+      "default": "good"
+     },
+     "purchase_date": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purchase Date"
+     },
+     "notes": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Notes"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "category"
+    ],
+    "title": "AssetIn"
+   },
+   "AttendanceAccessIn": {
+    "properties": {
+     "channel": {
+      "type": "string",
+      "enum": [
+       "web",
+       "mobile",
+       "premises"
+      ],
+      "title": "Channel",
+      "default": "web"
+     },
+     "enabled": {
+      "type": "boolean",
+      "title": "Enabled"
+     },
+     "branch_id": {
       "anyOf": [
        {
         "type": "string",
@@ -5760,32 +9718,7 @@
         "type": "null"
        }
       ],
-      "title": "Employee Id"
-     }
-    },
-    "type": "object",
-    "required": [
-     "leave_type_id",
-     "start_date",
-     "end_date"
-    ],
-    "title": "ApplyIn"
-   },
-   "AssignIn": {
-    "properties": {
-     "shift_id": {
-      "type": "string",
-      "format": "uuid",
-      "title": "Shift Id"
-     },
-     "employee_ids": {
-      "items": {
-       "type": "string",
-       "format": "uuid"
-      },
-      "type": "array",
-      "maxItems": 500,
-      "title": "Employee Ids"
+      "title": "Branch Id"
      },
      "department_id": {
       "anyOf": [
@@ -5799,18 +9732,26 @@
       ],
       "title": "Department Id"
      },
-     "effective_from": {
-      "type": "string",
-      "format": "date",
-      "title": "Effective From"
+     "employee_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Employee Ids"
+     },
+     "all_employees": {
+      "type": "boolean",
+      "title": "All Employees",
+      "default": false
      }
     },
     "type": "object",
     "required": [
-     "shift_id",
-     "effective_from"
+     "enabled"
     ],
-    "title": "AssignIn"
+    "title": "AttendanceAccessIn"
    },
    "AuditOut": {
     "properties": {
@@ -5966,6 +9907,18 @@
       "type": "string",
       "contentMediaType": "application/octet-stream",
       "title": "File"
+     },
+     "branch_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Branch Id"
      }
     },
     "type": "object",
@@ -5998,6 +9951,59 @@
      "file"
     ],
     "title": "Body_import_preview_api_v1_employees_import_preview_post"
+   },
+   "Body_submit_api_v1_expenses_post": {
+    "properties": {
+     "category_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Category Id"
+     },
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Amount"
+     },
+     "expense_date": {
+      "type": "string",
+      "format": "date",
+      "title": "Expense Date"
+     },
+     "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 3,
+      "title": "Description"
+     },
+     "receipt": {
+      "anyOf": [
+       {
+        "type": "string",
+        "contentMediaType": "application/octet-stream"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Receipt"
+     }
+    },
+    "type": "object",
+    "required": [
+     "category_id",
+     "amount",
+     "expense_date",
+     "description"
+    ],
+    "title": "Body_submit_api_v1_expenses_post"
    },
    "Body_upload_document_api_v1_employees__employee_id__documents_post": {
     "properties": {
@@ -6091,6 +10097,18 @@
       ],
       "title": "Phone"
      },
+     "email": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "email"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Email"
+     },
      "is_active": {
       "type": "boolean",
       "title": "Is Active",
@@ -6154,6 +10172,97 @@
     ],
     "title": "CandidateIn"
    },
+   "CareerSettingsIn": {
+    "properties": {
+     "headline": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 3,
+      "title": "Headline",
+      "default": "Build your future with us"
+     },
+     "introduction": {
+      "type": "string",
+      "maxLength": 600,
+      "title": "Introduction",
+      "default": "Explore our open roles and find your next opportunity."
+     },
+     "accent_color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$",
+      "title": "Accent Color",
+      "default": "#2563eb"
+     },
+     "cover_url": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1,
+        "format": "uri"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cover Url"
+     },
+     "logo_url": {
+      "anyOf": [
+       {
+        "type": "string",
+        "minLength": 1,
+        "format": "uri"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Logo Url"
+     }
+    },
+    "type": "object",
+    "title": "CareerSettingsIn"
+   },
+   "CategoryIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 2,
+      "title": "Name"
+     },
+     "max_amount": {
+      "anyOf": [
+       {
+        "type": "number",
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Max Amount"
+     },
+     "requires_receipt": {
+      "type": "boolean",
+      "title": "Requires Receipt",
+      "default": false
+     },
+     "is_active": {
+      "type": "boolean",
+      "title": "Is Active",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "CategoryIn"
+   },
    "ChangePasswordIn": {
     "properties": {
      "current_password": {
@@ -6173,6 +10282,29 @@
      "new_password"
     ],
     "title": "ChangePasswordIn"
+   },
+   "ChatIn": {
+    "properties": {
+     "message": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Message"
+     },
+     "history": {
+      "items": {
+       "$ref": "#/components/schemas/ConversationTurn"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "History"
+     }
+    },
+    "type": "object",
+    "required": [
+     "message"
+    ],
+    "title": "ChatIn"
    },
    "ChecklistIn": {
     "properties": {
@@ -6216,6 +10348,26 @@
     ],
     "title": "CodeIn"
    },
+   "CommentIn": {
+    "properties": {
+     "body": {
+      "type": "string",
+      "maxLength": 5000,
+      "minLength": 1,
+      "title": "Body"
+     },
+     "internal": {
+      "type": "boolean",
+      "title": "Internal",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "body"
+    ],
+    "title": "CommentIn"
+   },
    "ComponentIn": {
     "properties": {
      "name": {
@@ -6254,6 +10406,22 @@
       "title": "Taxable",
       "default": true
      },
+     "exempt_percent_of_basic": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exempt Percent Of Basic"
+     },
      "is_active": {
       "type": "boolean",
       "title": "Is Active",
@@ -6266,6 +10434,143 @@
      "kind"
     ],
     "title": "ComponentIn"
+   },
+   "ConfirmIn": {
+    "properties": {
+     "proposal_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Proposal Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "proposal_id"
+    ],
+    "title": "ConfirmIn"
+   },
+   "ConversationTurn": {
+    "properties": {
+     "role": {
+      "type": "string",
+      "enum": [
+       "user",
+       "assistant"
+      ],
+      "title": "Role"
+     },
+     "content": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Content"
+     }
+    },
+    "type": "object",
+    "required": [
+     "role",
+     "content"
+    ],
+    "title": "ConversationTurn"
+   },
+   "CourseIn": {
+    "properties": {
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Title"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 5000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "category": {
+      "type": "string",
+      "maxLength": 60,
+      "title": "Category",
+      "default": "General"
+     },
+     "mandatory": {
+      "type": "boolean",
+      "title": "Mandatory",
+      "default": false
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500,
+        "pattern": "^https?://"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "duration_hours": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 1000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duration Hours"
+     },
+     "is_active": {
+      "type": "boolean",
+      "title": "Is Active",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "title"
+    ],
+    "title": "CourseIn"
+   },
+   "CycleIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 3,
+      "title": "Name"
+     },
+     "period_start": {
+      "type": "string",
+      "format": "date",
+      "title": "Period Start"
+     },
+     "period_end": {
+      "type": "string",
+      "format": "date",
+      "title": "Period End"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "period_start",
+     "period_end"
+    ],
+    "title": "CycleIn"
    },
    "DecisionIn": {
     "properties": {
@@ -6291,6 +10596,19 @@
      "approve"
     ],
     "title": "DecisionIn"
+   },
+   "DemoLogin": {
+    "properties": {
+     "account": {
+      "type": "string",
+      "title": "Account"
+     }
+    },
+    "type": "object",
+    "required": [
+     "account"
+    ],
+    "title": "DemoLogin"
    },
    "DepartmentIn": {
     "properties": {
@@ -6374,6 +10692,26 @@
      "name"
     ],
     "title": "DesignationIn"
+   },
+   "DisburseIn": {
+    "properties": {
+     "disbursed_on": {
+      "type": "string",
+      "format": "date",
+      "title": "Disbursed On"
+     },
+     "first_due_month": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}$",
+      "title": "First Due Month"
+     }
+    },
+    "type": "object",
+    "required": [
+     "disbursed_on",
+     "first_due_month"
+    ],
+    "title": "DisburseIn"
    },
    "EducationIn": {
     "properties": {
@@ -7049,6 +11387,184 @@
     "type": "object",
     "title": "EmployeeUpdate"
    },
+   "EnrollmentPatch": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "pattern": "^(assigned|in_progress|completed)$",
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "EnrollmentPatch"
+   },
+   "FinanceDecisionIn": {
+    "properties": {
+     "approve": {
+      "type": "boolean",
+      "title": "Approve"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "approved_amount": {
+      "anyOf": [
+       {
+        "type": "number",
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Approved Amount"
+     },
+     "reimburse_via": {
+      "type": "string",
+      "pattern": "^(payroll|direct)$",
+      "title": "Reimburse Via",
+      "default": "payroll"
+     }
+    },
+    "type": "object",
+    "required": [
+     "approve"
+    ],
+    "title": "FinanceDecisionIn"
+   },
+   "GoalIn": {
+    "properties": {
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Title"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "employee_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Employee Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "title"
+    ],
+    "title": "GoalIn"
+   },
+   "GoalPatch": {
+    "properties": {
+     "title": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 3
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Title"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     },
+     "progress": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 100.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Progress"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(active|achieved|dropped)$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "title": "GoalPatch"
+   },
    "HTTPValidationError": {
     "properties": {
      "detail": {
@@ -7104,6 +11620,18 @@
        }
       ],
       "title": "Designation Id"
+     },
+     "manager_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Manager Id"
      }
     },
     "type": "object",
@@ -7211,6 +11739,41 @@
     ],
     "title": "InviteIn"
    },
+   "ItemIn": {
+    "properties": {
+     "department": {
+      "type": "string",
+      "maxLength": 40,
+      "minLength": 2,
+      "title": "Department"
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Title"
+     }
+    },
+    "type": "object",
+    "required": [
+     "department",
+     "title"
+    ],
+    "title": "ItemIn"
+   },
+   "ItemPatch": {
+    "properties": {
+     "done": {
+      "type": "boolean",
+      "title": "Done"
+     }
+    },
+    "type": "object",
+    "required": [
+     "done"
+    ],
+    "title": "ItemPatch"
+   },
    "JobIn": {
     "properties": {
      "title": {
@@ -7285,6 +11848,35 @@
      "title"
     ],
     "title": "JobIn"
+   },
+   "JoinIn": {
+    "properties": {
+     "token": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 10,
+      "title": "Token"
+     },
+     "full_name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 2,
+      "title": "Full Name"
+     },
+     "password": {
+      "type": "string",
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "token",
+     "full_name",
+     "password"
+    ],
+    "title": "JoinIn"
    },
    "LeaveTypeIn": {
     "properties": {
@@ -7399,6 +11991,53 @@
     ],
     "title": "LinkIn"
    },
+   "LoanIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "pattern": "^(loan|advance)$",
+      "title": "Kind"
+     },
+     "principal": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Principal"
+     },
+     "installments": {
+      "type": "integer",
+      "maximum": 60.0,
+      "minimum": 1.0,
+      "title": "Installments"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "principal",
+     "installments"
+    ],
+    "title": "LoanIn"
+   },
    "LoginIn": {
     "properties": {
      "email": {
@@ -7494,6 +12133,22 @@
      "password"
     ],
     "title": "MfaDisableIn"
+   },
+   "MobilePunchIn": {
+    "properties": {
+     "location": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PunchLocation"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "title": "MobilePunchIn"
    },
    "NoticeIn": {
     "properties": {
@@ -7686,6 +12341,46 @@
     ],
     "title": "Page[AuditOut]"
    },
+   "PatchIn": {
+    "properties": {
+     "exit_interview": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 10000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exit Interview"
+     },
+     "settlement": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Settlement"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "last_working_day": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Working Day"
+     }
+    },
+    "type": "object",
+    "title": "PatchIn"
+   },
    "PipelineIn": {
     "properties": {
      "stages": {
@@ -7759,6 +12454,114 @@
      "default_break_minutes"
     ],
     "title": "PolicyIn"
+   },
+   "PortalInviteIn": {
+    "properties": {
+     "role_key": {
+      "type": "string",
+      "maxLength": 60,
+      "title": "Role Key",
+      "default": "employee"
+     }
+    },
+    "type": "object",
+    "title": "PortalInviteIn"
+   },
+   "PremiseIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 80,
+      "minLength": 2,
+      "title": "Name"
+     },
+     "latitude": {
+      "type": "number",
+      "maximum": 90.0,
+      "minimum": -90.0,
+      "title": "Latitude"
+     },
+     "longitude": {
+      "type": "number",
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "Longitude"
+     },
+     "radius_m": {
+      "type": "integer",
+      "maximum": 10000.0,
+      "minimum": 10.0,
+      "title": "Radius M"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "latitude",
+     "longitude",
+     "radius_m"
+    ],
+    "title": "PremiseIn"
+   },
+   "PremisesIn": {
+    "properties": {
+     "premises": {
+      "items": {
+       "$ref": "#/components/schemas/PremiseIn"
+      },
+      "type": "array",
+      "maxItems": 20,
+      "title": "Premises"
+     }
+    },
+    "type": "object",
+    "required": [
+     "premises"
+    ],
+    "title": "PremisesIn"
+   },
+   "PunchLocation": {
+    "properties": {
+     "latitude": {
+      "type": "number",
+      "maximum": 90.0,
+      "minimum": -90.0,
+      "title": "Latitude"
+     },
+     "longitude": {
+      "type": "number",
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "Longitude"
+     },
+     "accuracy_m": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Accuracy M"
+     }
+    },
+    "type": "object",
+    "required": [
+     "latitude",
+     "longitude",
+     "accuracy_m"
+    ],
+    "title": "PunchLocation"
+   },
+   "RatingIn": {
+    "properties": {
+     "rating": {
+      "type": "integer",
+      "maximum": 5.0,
+      "minimum": 1.0,
+      "title": "Rating"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rating"
+    ],
+    "title": "RatingIn"
    },
    "RegisterIn": {
     "properties": {
@@ -7836,6 +12639,26 @@
     ],
     "title": "RegisterIn"
    },
+   "RepayIn": {
+    "properties": {
+     "installment_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 60,
+      "title": "Installment Ids"
+     },
+     "settle_all": {
+      "type": "boolean",
+      "title": "Settle All",
+      "default": false
+     }
+    },
+    "type": "object",
+    "title": "RepayIn"
+   },
    "ResetIn": {
     "properties": {
      "token": {
@@ -7856,6 +12679,38 @@
      "new_password"
     ],
     "title": "ResetIn"
+   },
+   "ReturnIn": {
+    "properties": {
+     "returned_on": {
+      "type": "string",
+      "format": "date",
+      "title": "Returned On"
+     },
+     "condition": {
+      "type": "string",
+      "pattern": "^(new|good|fair|damaged)$",
+      "title": "Condition"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "returned_on",
+     "condition"
+    ],
+    "title": "ReturnIn"
    },
    "RevisionIn": {
     "properties": {
@@ -8085,6 +12940,80 @@
     "type": "object",
     "title": "SelfUpdate"
    },
+   "Settlement": {
+    "properties": {
+     "leave_encashment_days": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 366.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Leave Encashment Days",
+      "default": "0"
+     },
+     "notice_pay": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "minimum": -100000000.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Notice Pay",
+      "default": "0"
+     },
+     "other_additions": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Other Additions",
+      "default": "0"
+     },
+     "other_deductions": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Other Deductions",
+      "default": "0"
+     },
+     "remarks": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Remarks"
+     }
+    },
+    "type": "object",
+    "title": "Settlement"
+   },
    "ShiftIn": {
     "properties": {
      "name": {
@@ -8157,6 +13086,126 @@
      "stage"
     ],
     "title": "StageIn"
+   },
+   "StartIn": {
+    "properties": {
+     "employee_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Employee Id"
+     },
+     "kind": {
+      "type": "string",
+      "pattern": "^(resignation|termination|retirement)$",
+      "title": "Kind"
+     },
+     "notice_date": {
+      "type": "string",
+      "format": "date",
+      "title": "Notice Date"
+     },
+     "last_working_day": {
+      "type": "string",
+      "format": "date",
+      "title": "Last Working Day"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "employee_id",
+     "kind",
+     "notice_date",
+     "last_working_day"
+    ],
+    "title": "StartIn"
+   },
+   "StatusIn": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "pattern": "^(available|maintenance|retired)$",
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "StatusIn"
+   },
+   "StatutoryIn": {
+    "properties": {
+     "income_tax": {
+      "type": "boolean",
+      "title": "Income Tax"
+     },
+     "eobi_enabled": {
+      "type": "boolean",
+      "title": "Eobi Enabled"
+     },
+     "eobi_wage_base": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 10000000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eobi Wage Base"
+     },
+     "eobi_employee_percent": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Eobi Employee Percent",
+      "default": "1"
+     },
+     "eobi_employer_percent": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Eobi Employer Percent",
+      "default": "5"
+     }
+    },
+    "type": "object",
+    "required": [
+     "income_tax",
+     "eobi_enabled"
+    ],
+    "title": "StatutoryIn"
    },
    "SwitchTenantIn": {
     "properties": {
@@ -8235,7 +13284,7 @@
       "anyOf": [
        {
         "type": "string",
-        "pattern": "^(todo|in_progress|done)$"
+        "pattern": "^(todo|in_progress|blocked|done)$"
        },
        {
         "type": "null"
@@ -8290,10 +13339,188 @@
        }
       ],
       "title": "Priority"
+     },
+     "assignee_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee Id"
      }
     },
     "type": "object",
     "title": "TaskPatch"
+   },
+   "TemplateIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 2,
+      "title": "Name"
+     },
+     "basic": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Basic"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/TemplateLineIn"
+      },
+      "type": "array",
+      "maxItems": 30,
+      "title": "Lines"
+     },
+     "increment_type": {
+      "type": "string",
+      "pattern": "^(none|percent|fixed)$",
+      "title": "Increment Type",
+      "default": "none"
+     },
+     "increment_value": {
+      "anyOf": [
+       {
+        "type": "number",
+        "maximum": 100000000.0,
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Increment Value",
+      "default": "0"
+     },
+     "is_active": {
+      "type": "boolean",
+      "title": "Is Active",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "name",
+     "basic"
+    ],
+    "title": "TemplateIn"
+   },
+   "TemplateLineIn": {
+    "properties": {
+     "component_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Component Id"
+     },
+     "amount": {
+      "anyOf": [
+       {
+        "type": "number",
+        "minimum": 0.0
+       },
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Amount"
+     }
+    },
+    "type": "object",
+    "required": [
+     "component_id"
+    ],
+    "title": "TemplateLineIn"
+   },
+   "TicketIn": {
+    "properties": {
+     "category": {
+      "type": "string",
+      "title": "Category"
+     },
+     "priority": {
+      "type": "string",
+      "pattern": "^(low|normal|high|urgent)$",
+      "title": "Priority",
+      "default": "normal"
+     },
+     "subject": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 3,
+      "title": "Subject"
+     },
+     "description": {
+      "type": "string",
+      "maxLength": 5000,
+      "minLength": 3,
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "category",
+     "subject",
+     "description"
+    ],
+    "title": "TicketIn"
+   },
+   "TicketPatch": {
+    "properties": {
+     "status": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(open|in_progress|resolved|closed)$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "priority": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(low|normal|high|urgent)$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Priority"
+     },
+     "assignee_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee Id"
+     }
+    },
+    "type": "object",
+    "title": "TicketPatch"
    },
    "TokenIn": {
     "properties": {
@@ -8349,6 +13576,218 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "app__modules__assets__router__AssignIn": {
+    "properties": {
+     "employee_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Employee Id"
+     },
+     "assigned_on": {
+      "type": "string",
+      "format": "date",
+      "title": "Assigned On"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "employee_id",
+     "assigned_on"
+    ],
+    "title": "AssignIn"
+   },
+   "app__modules__attendance__router__AssignIn": {
+    "properties": {
+     "shift_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Shift Id"
+     },
+     "employee_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Employee Ids"
+     },
+     "department_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Id"
+     },
+     "effective_from": {
+      "type": "string",
+      "format": "date",
+      "title": "Effective From"
+     }
+    },
+    "type": "object",
+    "required": [
+     "shift_id",
+     "effective_from"
+    ],
+    "title": "AssignIn"
+   },
+   "app__modules__leave__router__ApplyIn": {
+    "properties": {
+     "leave_type_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Leave Type Id"
+     },
+     "start_date": {
+      "type": "string",
+      "format": "date",
+      "title": "Start Date"
+     },
+     "end_date": {
+      "type": "string",
+      "format": "date",
+      "title": "End Date"
+     },
+     "half_day": {
+      "type": "boolean",
+      "title": "Half Day",
+      "default": false
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "employee_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Employee Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "leave_type_id",
+     "start_date",
+     "end_date"
+    ],
+    "title": "ApplyIn"
+   },
+   "app__modules__payroll__templates__ApplyIn": {
+    "properties": {
+     "effective_from": {
+      "type": "string",
+      "format": "date",
+      "title": "Effective From"
+     },
+     "employee_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 1000,
+      "title": "Employee Ids"
+     },
+     "all_employees": {
+      "type": "boolean",
+      "title": "All Employees",
+      "default": false
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "effective_from"
+    ],
+    "title": "ApplyIn"
+   },
+   "app__modules__training__router__AssignIn": {
+    "properties": {
+     "employee_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Employee Ids"
+     },
+     "department_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Department Id"
+     },
+     "everyone": {
+      "type": "boolean",
+      "title": "Everyone",
+      "default": false
+     },
+     "due_date": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due Date"
+     }
+    },
+    "type": "object",
+    "title": "AssignIn"
    }
   }
  }

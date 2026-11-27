@@ -170,7 +170,7 @@ export function SecurityPage() {
   return (
     <>
       <PageHeader title="Security" description="Protect your account and review where you are signed in." />
-      <div className="grid max-w-3xl gap-4"><MfaCard /><SessionsCard /><PasswordCard /></div>
+      <div className="grid max-w-3xl grid-cols-1 gap-4"><MfaCard /><SessionsCard /><PasswordCard /></div>
     </>
   )
 }

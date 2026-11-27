@@ -74,7 +74,8 @@ def balance(db: Session, employee_id: uuid.UUID, lt: LeaveType, year: int | None
     used = -_sum(db, employee_id, lt.id, ("used", "restored"), year)
     reserved = -_sum(db, employee_id, lt.id, ("reserved", "released"), year)
     return {"leave_type_id": lt.id, "name": lt.name, "is_paid": lt.is_paid, "year": year, "entitled": entitled,
-            "used": used, "reserved": reserved, "available": entitled - used - reserved}
+            "used": used, "reserved": reserved, "available": entitled - used - reserved,
+            "carried_forward": _sum(db, employee_id, lt.id, ("carry_forward",), year)}
 
 
 def balances(db: Session, employee_id: uuid.UUID, year: int | None = None) -> list[dict]:

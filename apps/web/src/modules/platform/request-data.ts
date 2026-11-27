@@ -15,7 +15,15 @@ export const requestDetail = (r: RequestRow) => r.reason || r.description || (r.
 export const requestTones: Record<string, string> = { Leave: 'bg-primary-soft text-primary', Attendance: 'bg-info-soft text-cyan', Expense: 'bg-success-soft text-success', Loan: 'bg-warning-soft text-warning', 'HR ticket': 'bg-surface-2 text-muted' }
 export const requestKey = (r: RequestRow) => `${r.slug}:${r.id}`
 export const seenStorageKey = (identityId: string | undefined, tenantId: string | undefined, own: boolean) => `talvynza-inbox-seen:${identityId || ''}:${tenantId || ''}:${own ? 'mine' : 'team'}`
-export const sourceLink = (r: RequestRow) => r.categoryLabel === 'HR ticket' ? `${r.to}/${r.id}` : r.to
+export function sourceLink(r: RequestRow, finance: boolean) {
+  if (r.slug === 'ticket') return `${r.to}/${r.id}`
+  const [path, query] = r.to.split('?')
+  const params = new URLSearchParams(query)
+  if (path === '/expenses') params.set('tab', finance ? 'all' : 'team')
+  if (r.slug === 'leave' || r.slug === 'attendance') params.set('status', 'all')
+  params.set('record', r.id)
+  return `${path}?${params}`
+}
 
 export function useRequestRows(own: boolean) {
   const { data: me } = useMe()

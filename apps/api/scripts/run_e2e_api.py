@@ -7,7 +7,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 os.chdir(root)
-for name in ("e2e.db", "e2e-storage"):
+for name in ("e2e.db", "e2e.db-wal", "e2e.db-shm", "e2e-storage"):
     p = root / name
     if p.is_dir():
         shutil.rmtree(p, ignore_errors=True)

@@ -1,7 +1,9 @@
 # Database ERD
 
-Implemented in migration `0001` (Phase 1). Tables for later phases (see `PROGRESS.md`) will extend this diagram and
-reference `tenants.id` + `tenant_memberships`/`employees` as described in the product spec.
+The first diagram shows organization access. The second summarizes the records that connect placement,
+attendance, leave, payroll, and workplace workflows. See the Alembic migrations for exact columns and constraints.
+
+## Access and tenancy
 
 ```mermaid
 erDiagram
@@ -128,3 +130,30 @@ is approved. Money columns are `NUMERIC(14,2)`. Dates without a time zone (joini
 * Timestamps are UTC instants (`timestamptz`); money will use `NUMERIC(18,2)` (never float).
 * `audit_logs` is append-only (ORM update/delete raises). `security_events` is platform-level, not tenant-scoped.
 * `tenants`, `tenant_memberships`, `identities` and `permissions` are intentionally not auto-scoped (see ARCHITECTURE §2).
+
+
+## Employee and operational records
+
+```mermaid
+erDiagram
+    TENANTS ||--o{ BRANCHES : owns
+    TENANTS ||--o{ DEPARTMENTS : owns
+    TENANTS ||--o{ EMPLOYEES : employs
+    BRANCHES o|--o{ EMPLOYEES : places
+    DEPARTMENTS o|--o{ EMPLOYEES : groups
+    DEPARTMENTS o|--o{ DESIGNATIONS : defines
+    EMPLOYEES ||--o{ EMPLOYEE_ASSIGNMENTS : tracks
+    EMPLOYEES ||--o{ ATTENDANCE_EVENTS : records
+    EMPLOYEES ||--o{ ATTENDANCE_DAILY : summarizes
+    EMPLOYEES ||--o{ LEAVE_REQUESTS : submits
+    EMPLOYEES ||--o{ SALARY_REVISIONS : receives
+    EMPLOYEES ||--o{ PAYROLL_ENTRIES : receives
+    PAYROLL_RUNS ||--o{ PAYROLL_ENTRIES : contains
+    EMPLOYEES ||--o{ EXPENSE_CLAIMS : submits
+    EMPLOYEES ||--o{ LOANS : requests
+    EMPLOYEES ||--o{ ASSET_ASSIGNMENTS : holds
+```
+
+A branch stores its premises as named circular boundaries. Employee attendance settings separately control
+web, mobile, and biometric access. Historical employee data can have an empty placement. New employees
+require an active branch and department.

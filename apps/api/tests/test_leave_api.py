@@ -137,6 +137,9 @@ def test_request_scopes_team_and_all(signup, new_client):
     assert worker.get(f"{API}/leave/requests", params={"scope": "team"}).status_code == 403
     assert worker.get(f"{API}/leave/requests", params={"scope": "all"}).status_code == 403
     assert len(owner.get(f"{API}/leave/requests", params={"scope": "all"}).json()) == 1
+    selected = boss.get(f"{API}/leave/requests", params={"scope": "team", "employee_id": emp["id"]}).json()
+    assert len(selected) == 1 and selected[0]["employee_id"] == emp["id"]
+    assert worker.get(f"{API}/leave/requests", params={"employee_id": my_employee_id(boss)}).json() == []
     month = boss.get(f"{API}/leave/calendar", params={"month": f"{YEAR}-03"}).json()
     assert len(month) == 1 and month[0]["status"] == "pending"
     assert worker.get(f"{API}/leave/balances", params={"employee_id": my_employee_id(boss)}).status_code == 404

@@ -4,7 +4,7 @@ import {
   Search, ShieldCheck, Sun, UserRound,
 } from 'lucide-react'
 import * as React from 'react'
-import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ErrorState, Skeleton } from '@/components/ui/card'
@@ -14,6 +14,7 @@ import { Menu, MenuContent, MenuItem, MenuLabel, MenuSeparator, MenuTrigger } fr
 import { ApiError, api, errorMessage } from '@/lib/api'
 import { useMe } from '@/lib/queries'
 import { cn } from '@/lib/utils'
+import { rememberView, restoreView } from '@/lib/view-state'
 import { useUi } from '@/stores/ui'
 import { CommandPalette } from './CommandPalette'
 import { ADMIN, MY_SPACE, allowedPath, hasAdminSide, isMySpace, visibleGroups } from './nav'
@@ -23,6 +24,7 @@ import { ModuleWalkthrough } from './ModuleWalkthrough'
 import { Notifications } from './Notifications'
 
 const TaliAssistant = React.lazy(() => import('@/components/assistant/TaliAssistant').then(module => ({ default: module.TaliAssistant })))
+const modulePaths = new Set([...ADMIN, ...MY_SPACE].flatMap(group => group.items.map(item => item.to)))
 
 export function Brand({ compact }: { compact?: boolean }) {
   return (
@@ -128,6 +130,7 @@ function Sidebar({ compact, onNavigate }: { compact: boolean; onNavigate?: () =>
   const { data: me } = useMe()
   const { pathname } = useLocation()
   const perms = new Set(me?.permissions ?? [])
+  const viewScope = me?.active_organization && `${me.identity.id}:${me.active_organization.id}`
   const mine = isMySpace(pathname)
   const admin = hasAdminSide(perms)
   const groups = visibleGroups(mine && me?.employee ? MY_SPACE : ADMIN, perms)
@@ -143,7 +146,7 @@ function Sidebar({ compact, onNavigate }: { compact: boolean; onNavigate?: () =>
             {!compact && <p className="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-subtle">{g.label}</p>}
             <div className="space-y-0.5">
               {g.items.map((n) => (
-                <NavLink key={n.to} to={n.to} end={n.end} onClick={onNavigate} title={compact ? n.label : undefined}
+                <NavLink key={n.to} to={restoreView(viewScope ?? undefined, n.to)} end={n.end} onClick={onNavigate} title={compact ? n.label : undefined}
                   className={({ isActive }) => cn('group relative flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg',
                     isActive && 'bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary', compact && 'justify-center px-0')}>
                   {({ isActive }) => (<>
@@ -167,23 +170,14 @@ export function AppShell() {
   const [palette, setPalette] = React.useState(false)
   const [help, setHelp] = React.useState(false)
   const [guideStep, setGuideStep] = React.useState(0)
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
+  const navigationType = useNavigationType()
+  const viewScope = me?.active_organization && `${me.identity.id}:${me.active_organization.id}`
   const moduleGuide = guideFor(pathname)
-  const guideKey = me?.identity?.id && me.active_organization?.id && moduleGuide ? `talvynza-guide-v2:${me.identity.id}:${me.active_organization.id}:${moduleGuide.title}` : null
   React.useEffect(() => {
     setGuideStep(0)
     setHelp(false)
-    if (!guideKey || localStorage.getItem(guideKey) === 'seen') return
-    const main = document.getElementById('main')
-    if (!main) return
-    const observer = new MutationObserver(() => {
-      if (main.querySelector('[data-tour="page-header"], h1')) { observer.disconnect(); setHelp(true) }
-    })
-    observer.observe(main, { childList: true, subtree: true })
-    if (main.querySelector('[data-tour="page-header"], h1')) { observer.disconnect(); setHelp(true) }
-    return () => observer.disconnect()
-  }, [guideKey])
-  const closeGuide = () => { if (guideKey) localStorage.setItem(guideKey, 'seen'); setHelp(false) }
+  }, [pathname])
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(true) } }
@@ -191,9 +185,15 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  React.useEffect(() => { setDrawer(false); window.scrollTo(0, 0) }, [pathname])
+  React.useEffect(() => {
+    setDrawer(false)
+    if (navigationType !== 'POP') window.scrollTo(0, 0)
+  }, [pathname])
+  React.useEffect(() => {
+    if (viewScope && modulePaths.has(pathname)) rememberView(viewScope, pathname, search)
+  }, [viewScope, pathname, search])
 
-  if (error instanceof ApiError && error.status === 401) return pathname === '/' ? <LandingPage /> : <Navigate to="/login" replace state={{ from: pathname }} />
+  if (error instanceof ApiError && error.status === 401) return pathname === '/' ? <LandingPage /> : <Navigate to="/login" replace state={{ from: pathname + search }} />
   if (error) return <ErrorState message={errorMessage(error)} onRetry={() => refetch()} />
   if (isLoading || !me) return <div className="space-y-4 p-8"><Skeleton className="h-10 w-64" /><Skeleton className="h-64 w-full" /></div>
   if (!me.active_organization && pathname !== '/organizations/new') return <Navigate to="/organizations/new" replace />
@@ -202,6 +202,7 @@ export function AppShell() {
   const currentGroups = visibleGroups(isMySpace(pathname) && me.employee ? MY_SPACE : ADMIN, perms)
   const currentGroup = currentGroups.find(g => g.items.some(i => pathname === i.to || (i.to !== '/' && pathname.startsWith(i.to + '/'))))
   const currentItem = currentGroups.flatMap(g => g.items).sort((a, b) => b.to.length - a.to.length).find(i => pathname === i.to || (i.to !== '/' && pathname.startsWith(i.to + '/')))
+  const inbox = currentGroups.flatMap(g => g.items).find(i => i.to === (isMySpace(pathname) ? '/me/requests' : '/inbox'))
   // People with nothing to manage land on their own space. People without an employee record only have the admin side.
   if (pathname === '/' && me.employee && !hasAdminSide(perms)) return <Navigate to="/me" replace />
   if (isMySpace(pathname) && !me.employee && me.active_organization) return <Navigate to="/" replace />
@@ -225,13 +226,18 @@ export function AppShell() {
             <Search className="h-4 w-4 shrink-0" /><span className="hidden flex-1 truncate text-left sm:block">Search pages and people</span>
             <kbd className="hidden rounded border border-border bg-surface px-1.5 font-sans text-[11px] text-muted sm:block">Ctrl K</kbd>
           </button>
-          <div className="ml-auto flex shrink-0 items-center gap-0.5"><span data-tour="request-inbox"><Button asChild variant="ghost" size="icon" aria-label="Request inbox" title="Request inbox"><Link to={isMySpace(pathname) ? '/me/requests' : '/inbox'}><Inbox className="h-[18px] w-[18px]" /></Link></Button></span><Notifications /><Button variant="ghost" size="icon" aria-label="Help for this module" title="Help for this module" onClick={() => { setGuideStep(0); setHelp(true) }}><CircleHelp className="h-[18px] w-[18px]" /></Button><span className="hidden sm:inline-flex"><ThemeMenu /></span><UserMenu /></div>
+          <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            {inbox && <span data-tour="request-inbox"><Button asChild variant="ghost" size="icon" aria-label={inbox.label} title={inbox.label}><Link to={restoreView(viewScope ?? undefined, inbox.to)}><Inbox className="h-[18px] w-[18px]" /></Link></Button></span>}
+            <Notifications />
+            {moduleGuide && allowedPath(pathname, perms) && <Button variant="ghost" size="icon" aria-label="Help for this module" title="Help for this module" onClick={() => { setGuideStep(0); setHelp(true) }}><CircleHelp className="h-[18px] w-[18px]" /></Button>}
+            <span className="hidden sm:inline-flex"><ThemeMenu /></span><UserMenu />
+          </div>
         </header>
-        <nav aria-label="Mobile modules" className="no-print sticky top-14 z-10 flex items-center gap-2 overflow-x-auto border-b border-border bg-surface px-3 py-2 md:hidden"><select aria-label="Go to module" className="h-8 max-w-36 shrink-0 rounded-md border border-border bg-surface px-2 text-xs font-semibold" value={currentItem?.to ?? ''} onChange={e => navigate(e.target.value)}><option value="" disabled>Choose module</option>{currentGroups.map(g => <optgroup key={g.label} label={g.label}>{g.items.map(i => <option key={i.to} value={i.to}>{i.label}</option>)}</optgroup>)}</select>{currentGroup?.items.map(i => <Link key={i.to} to={i.to} className={cn('shrink-0 rounded-md px-3 py-1.5 text-xs font-medium', pathname === i.to ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-2')}>{i.label}</Link>)}</nav>
+        <nav aria-label="Mobile modules" className="no-print sticky top-14 z-10 flex items-center gap-2 overflow-x-auto border-b border-border bg-surface px-3 py-2 md:hidden"><select aria-label="Go to module" className="h-8 max-w-36 shrink-0 rounded-md border border-border bg-surface px-2 text-xs font-semibold" value={currentItem?.to ?? ''} onChange={e => navigate(restoreView(viewScope ?? undefined, e.target.value))}><option value="" disabled>Choose module</option>{currentGroups.map(g => <optgroup key={g.label} label={g.label}>{g.items.map(i => <option key={i.to} value={i.to}>{i.label}</option>)}</optgroup>)}</select>{currentGroup?.items.map(i => <Link key={i.to} to={restoreView(viewScope ?? undefined, i.to)} className={cn('shrink-0 rounded-md px-3 py-1.5 text-xs font-medium', pathname === i.to ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-2')}>{i.label}</Link>)}</nav>
         <main id="main" className="mx-auto max-w-[1400px] p-4 sm:p-6 lg:p-8">{allowedPath(pathname, perms) ? <React.Suspense fallback={<div role="status" className="space-y-4" aria-label="Loading module"><Skeleton className="h-10 w-64" /><Skeleton className="h-48 w-full rounded-xl" /></div>}><Outlet /></React.Suspense> : <div className="rounded-xl border border-border bg-surface p-10 text-center"><ShieldCheck className="mx-auto mb-4 h-10 w-10 text-muted" /><h1 className="text-xl font-bold">This page needs a different role</h1><p className="my-3 text-muted">Your account does not have access to this area. Contact your HR administrator if you need it.</p><Button asChild><Link to={me.employee ? '/me' : '/'}>Back to my workspace</Link></Button></div>}</main>
       </div>
-      {help && moduleGuide && allowedPath(pathname, perms) && <ModuleWalkthrough guide={moduleGuide} step={guideStep} onStep={setGuideStep} onClose={closeGuide} />}
-      <CommandPalette open={palette} onOpenChange={setPalette} />
+      {help && moduleGuide && allowedPath(pathname, perms) && <ModuleWalkthrough guide={moduleGuide} step={guideStep} onStep={setGuideStep} onClose={() => setHelp(false)} />}
+      <CommandPalette open={palette} onOpenChange={setPalette} viewScope={viewScope ?? undefined} />
       {!help && !palette && !drawer && <React.Suspense fallback={null}><TaliAssistant /></React.Suspense>}
     </div>
   )

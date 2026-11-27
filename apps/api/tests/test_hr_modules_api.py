@@ -34,13 +34,15 @@ def test_expense_policy_checks(signup, new_client, tmp_path, monkeypatch):
 
 
 def test_expense_two_step_approval_partial_amount_and_single_reimbursement(signup, new_client):
-    owner, worker, boss, *_ = team(signup, new_client)
+    owner, worker, boss, worker_emp, boss_emp = team(signup, new_client)
     cid = claim(worker, cats(worker)["Meals"]).json()["id"]
     # finance cannot skip the manager when the employee has one
     early = owner.post(f"{API}/expenses/{cid}/finance-decision", {"approve": True})
     assert early.status_code == 409 and early.json()["error"]["code"] == "invalid_state"
     assert worker.post(f"{API}/expenses/{cid}/manager-decision", {"approve": True}).status_code == 403
     assert len(boss.get(f"{API}/expenses", params={"scope": "team"}).json()) == 1
+    assert [c["id"] for c in boss.get(f"{API}/expenses", params={"scope": "team", "employee_id": worker_emp["id"]}).json()] == [cid]
+    assert boss.get(f"{API}/expenses", params={"scope": "team", "employee_id": boss_emp["id"]}).json() == []
     assert boss.post(f"{API}/expenses/{cid}/manager-decision", {"approve": True}).json()["status"] == "manager_approved"
     assert boss.post(f"{API}/expenses/{cid}/manager-decision", {"approve": True}).status_code == 409
     too_much = owner.post(f"{API}/expenses/{cid}/finance-decision", {"approve": True, "approved_amount": "9999"})
@@ -89,10 +91,13 @@ def test_installment_schedule_rounding():
 
 
 def test_loan_request_approval_disbursement_and_repayment(signup, new_client):
-    owner, worker, boss, *_ = team(signup, new_client)
+    owner, worker, boss, worker_emp, boss_emp = team(signup, new_client)
     loan = worker.post(f"{API}/loans", {"kind": "loan", "principal": "90000", "installments": 3, "reason": "Rent"})
     assert loan.status_code == 201
     lid = loan.json()["id"]
+    worker_loans = owner.get(f"{API}/loans", params={"scope": "all", "employee_id": worker_emp["id"]}).json()
+    assert [loan_row["id"] for loan_row in worker_loans] == [lid]
+    assert owner.get(f"{API}/loans", params={"scope": "all", "employee_id": boss_emp["id"]}).json() == []
     dup = worker.post(f"{API}/loans", {"kind": "loan", "principal": "1000", "installments": 1})
     assert dup.status_code == 409 and dup.json()["error"]["code"] == "open_loan_exists"
     assert worker.post(f"{API}/loans", {"kind": "advance", "principal": "1000", "installments": 5}).status_code == 422
@@ -136,6 +141,8 @@ def test_asset_assignment_return_and_history(signup, new_client):
     assert worker.get(f"{API}/assets").status_code == 403
     r = owner.post(f"{API}/assets/{a['id']}/assign", {"employee_id": worker_emp["id"], "assigned_on": "2026-11-01"})
     assert r.json()["status"] == "assigned" and r.json()["assigned_to"] == "Worker Bee"
+    assert [row["id"] for row in owner.get(f"{API}/assets", params={"holder_id": worker_emp["id"]}).json()] == [a["id"]]
+    assert owner.get(f"{API}/assets", params={"holder_id": boss_emp["id"]}).json() == []
     again = owner.post(f"{API}/assets/{a['id']}/assign", {"employee_id": boss_emp["id"], "assigned_on": "2026-11-02"})
     assert again.status_code == 409 and again.json()["error"]["code"] == "not_available"
     assert owner.post(f"{API}/assets/{a['id']}/status", {"status": "retired"}).status_code == 409
@@ -145,6 +152,7 @@ def test_asset_assignment_return_and_history(signup, new_client):
     assert owner.post(f"{API}/assets/{a['id']}/return", {"returned_on": "2026-10-01", "condition": "good"}).status_code == 422
     back = owner.post(f"{API}/assets/{a['id']}/return", {"returned_on": "2026-11-10", "condition": "fair"}).json()
     assert back["status"] == "available" and back["condition"] == "fair"
+    assert owner.get(f"{API}/assets", params={"holder_id": worker_emp["id"]}).json() == []
     assert owner.post(f"{API}/assets/{a['id']}/return", {"returned_on": "2026-11-11", "condition": "fair"}).status_code == 409
     owner.post(f"{API}/assets/{a['id']}/assign", {"employee_id": boss_emp["id"], "assigned_on": "2026-11-12"})
     hist = owner.get(f"{API}/assets/{a['id']}/history").json()

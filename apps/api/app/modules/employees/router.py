@@ -195,6 +195,11 @@ def create_employee(body: EmployeeIn, ctx: AuthContext = Depends(require("employ
     return _detail(emp, service.name_maps(db), ctx.permissions, False)
 
 
+@router.get("/employees/setup")
+def employee_setup(ctx: AuthContext = Depends(require("employees.manage")), db: Session = Depends(get_db)):
+    return {"missing": service.missing_setup(db)}
+
+
 @router.get("/employees/template.csv", response_class=PlainTextResponse)
 def import_template(ctx: AuthContext = Depends(require("employees.manage"))):
     return PlainTextResponse(service.template_csv(), media_type="text/csv",

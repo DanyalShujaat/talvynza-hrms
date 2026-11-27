@@ -7,6 +7,7 @@ const py = process.platform === 'win32' ? join('.venv', 'Scripts', 'python') : j
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
+  expect: { timeout: 15_000 },
   workers: 1,
   fullyParallel: false,
   reporter: [['list']],

@@ -41,14 +41,20 @@ function InviteDialog() {
   )
 }
 
-function EditRolesDialog({ membershipId, current, name }: { membershipId: string; current: string[]; name: string }) {
+export function EditRolesDialog({ membershipId, current, name }: { membershipId: string; current: string[]; name: string }) {
   const [open, setOpen] = React.useState(false)
   const [sel, setSel] = React.useState<Set<string>>(new Set(current))
   const roles = useRoles()
   const qc = useQueryClient()
   const m = useMutation({
     mutationFn: () => api(`/members/${membershipId}/roles`, { method: 'PUT', body: { role_keys: [...sel] } }),
-    onSuccess: () => { toast.success('Roles updated'); setOpen(false); qc.invalidateQueries({ queryKey: ['members'] }); qc.invalidateQueries({ queryKey: ['audit'] }) },
+    onSuccess: () => {
+      toast.success('Roles updated')
+      setOpen(false)
+      qc.invalidateQueries({ queryKey: ['members'] })
+      qc.invalidateQueries({ queryKey: ['/members'] })
+      qc.invalidateQueries({ queryKey: ['audit'] })
+    },
     onError: (e) => toast.error(errorMessage(e)),
   })
   return (

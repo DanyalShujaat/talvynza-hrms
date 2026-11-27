@@ -12,7 +12,7 @@ test.beforeAll(async ({ browser }) => {
 })
 test.afterAll(async () => page.context().close())
 
-const go = async (path: string) => { await page.goto(path); await page.waitForLoadState('networkidle'); const skip = page.getByRole('button', { name: 'Skip walkthrough' }); await skip.waitFor({ state: 'visible', timeout: 2500 }).catch(() => {}); if (await skip.isVisible()) await skip.click() }
+const go = (path: string) => page.goto(path, { waitUntil: 'domcontentloaded' })
 
 test('1. signup creates an organization and the owner can sign in', async () => {
   await go('/register')
@@ -21,7 +21,7 @@ test('1. signup creates an organization and the owner can sign in', async () => 
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByLabel('Organization name').fill('E2E Industries')
   await page.getByRole('button', { name: 'Create account' }).click()
-  await expect(page.getByText('Check your inbox')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your registration is ready' })).toBeVisible()
   await go('/login')
   await page.getByLabel('Work email').fill(EMAIL)
   await page.getByLabel('Password').fill(PASSWORD)
@@ -31,8 +31,11 @@ test('1. signup creates an organization and the owner can sign in', async () => 
   await expect(page.getByRole('button', { name: 'Switch organization' })).toContainText('E2E Industries')
 })
 
-test('module walkthrough starts on first visit and can be replayed', async () => {
+test('module walkthrough is available on demand', async () => {
   await page.goto('/branches')
+  await expect(page.getByRole('heading', { name: 'Branches', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Branches walkthrough' })).toBeHidden()
+  await page.getByRole('button', { name: 'Help for this module' }).click()
   await expect(page.getByRole('dialog', { name: 'Branches walkthrough' })).toBeVisible()
   await page.getByRole('button', { name: 'Next' }).click()
   await expect(page.getByText('Place employees', { exact: true })).toBeVisible()
@@ -40,6 +43,33 @@ test('module walkthrough starts on first visit and can be replayed', async () =>
   await page.getByRole('button', { name: 'Help for this module' }).click()
   await expect(page.getByRole('dialog', { name: 'Branches walkthrough' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip walkthrough' }).click()
+})
+
+test('Tali keeps connection details out of the conversation and confirms changes explicitly', async () => {
+  await go('/')
+  const status = '**/api/v1/assistant/status'
+  const chat = '**/api/v1/assistant/chat'
+  const confirm = '**/api/v1/assistant/confirm'
+  await page.route(status, route => route.fulfill({ json: { ready: true, provider: 'example-provider', message: 'Internal connection details' } }))
+  await page.route(chat, route => route.fulfill({ json: { reply: 'I can create that task.', link: null, proposal: { id: 'sample', description: 'Create a task called Review requests' } } }))
+  await page.route(confirm, route => route.fulfill({ json: { reply: 'Task created.', link: { label: 'Open my tasks', path: '/me/tasks' } } }))
+  try {
+    const launcher = page.getByRole('button', { name: 'Open Tali assistant' })
+    await launcher.click()
+    const panel = page.getByRole('region', { name: 'Chat with Tali' })
+    await expect(panel).toBeVisible()
+    await expect(panel).not.toContainText(/example-provider|Internal connection details/)
+    await panel.getByRole('button', { name: 'Create a task' }).click()
+    await expect(panel.getByText('Create a task called Review requests')).toBeVisible()
+    await panel.getByRole('button', { name: 'Confirm change' }).click()
+    await expect(panel.getByRole('link', { name: 'Open my tasks' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(launcher).toBeFocused()
+  } finally {
+    await page.unroute(status)
+    await page.unroute(chat)
+    await page.unroute(confirm)
+  }
 })
 
 test('sidebar stays mounted while a new module loads', async () => {
@@ -54,12 +84,15 @@ test('sidebar stays mounted while a new module loads', async () => {
 })
 
 test('2. organization structure: branch, department and designation', async () => {
+  await go('/departments')
+  await expect(page.getByRole('button', { name: 'Add Department' })).toBeDisabled()
+  await expect(page.getByRole('link', { name: 'Add an active branch' })).toHaveAttribute('href', '/branches')
   await go('/branches')
   await page.getByRole('button', { name: 'Add Branch' }).click()
   await page.getByLabel('Name').fill('Head Office')
   await page.getByLabel('City').fill('Peshawar')
   await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByRole('cell', { name: /Head Office/ })).toBeVisible()
+  await expect(page.getByRole('cell', { name: 'Head Office Peshawar', exact: true })).toBeVisible()
 
   await go('/departments')
   await page.getByRole('button', { name: 'Add Department' }).click()
@@ -75,6 +108,22 @@ test('2. organization structure: branch, department and designation', async () =
 })
 
 test('3. add an employee through the form and find them in the list', async () => {
+  test.slow()
+  await go('/employees')
+  await page.getByRole('tab', { name: 'Add employee', exact: true }).click()
+  await expect(page.getByText('Complete setup before adding employees')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Save the attendance policy' })).toHaveAttribute('href', '/policies')
+  await expect(page.getByRole('link', { name: 'Create an active salary template' })).toHaveAttribute('href', '/payroll?tab=templates')
+  await go('/policies')
+  await page.getByRole('button', { name: 'Save policy' }).click()
+  await expect(page.getByText('Attendance policy saved')).toBeVisible()
+  await go('/payroll?tab=templates')
+  await page.getByRole('button', { name: 'New template' }).click()
+  await page.getByLabel('Template name').fill('Standard salary')
+  await page.getByLabel('Base salary per pay period').fill('50000')
+  await page.getByRole('button', { name: 'Create template' }).click()
+  await expect(page.getByRole('heading', { name: 'Standard salary' })).toBeVisible()
+
   await go('/employees')
   await page.getByRole('tab', { name: 'Add employee', exact: true }).click()
   await page.getByLabel('First name').fill('Sara')
@@ -89,17 +138,51 @@ test('3. add an employee through the form and find them in the list', async () =
   await expect(page.getByText('Software Engineer · 1002')).toBeVisible()
 
   await go('/employees')
-  await page.getByPlaceholder('Search by name, ID, etc...').fill('sara')
+  await page.getByPlaceholder('Search by name, ID, etc...').fill('Sara Khan')
   await expect(page.getByRole('link', { name: 'Sara Khan' })).toBeVisible()
   await page.getByRole('button', { name: 'S', exact: true }).click()
   await expect(page.getByRole('link', { name: 'Sara Khan' })).toBeVisible()
   await page.getByRole('button', { name: 'Grid view' }).click()
   await expect(page.getByText('Software Engineer').first()).toBeVisible()
+  await page.getByLabel('Department', { exact: true }).selectOption({ label: 'Engineering' })
+  await page.locator('aside').getByRole('link', { name: 'Branches', exact: true }).click()
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Search', exact: true }).fill('Employees')
+  await page.getByRole('option', { name: 'Employees Admin · People' }).click()
+  await expect(page.getByPlaceholder('Search by name, ID, etc...')).toHaveValue('Sara Khan')
+  await expect(page.getByLabel('Department', { exact: true }).locator('option:checked')).toHaveText('Engineering')
+})
+
+test('employee directory actions open the selected profile sections', async () => {
+  test.slow()
+  await go('/employees')
+  await page.getByRole('button', { name: 'Actions for Sara Khan' }).click()
+  await page.getByRole('menuitem', { name: 'Attendance' }).click()
+  await expect(page.getByRole('heading', { name: 'Sara Khan' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Attendance settings' })).toBeVisible()
+  await expect(page.getByText('Organization default', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Monthly attendance' })).toBeVisible()
+
+  const sections = page.getByRole('navigation', { name: 'Profile sections' })
+  await sections.getByRole('link', { name: 'Official information' }).click()
+  await expect(page.getByRole('heading', { name: 'Employment and placement' })).toBeVisible()
+  await sections.getByRole('link', { name: 'Documents' }).click()
+  await expect(page.getByRole('heading', { name: 'Education' })).toBeVisible()
+  await sections.getByRole('link', { name: 'Salary details' }).click()
+  await expect(page.getByRole('heading', { name: 'Salary revision history' })).toBeVisible()
+  await sections.getByRole('link', { name: 'Payslips', exact: true }).click()
+  await expect(page.getByText('No payslips yet')).toBeVisible()
+  await sections.getByRole('link', { name: 'Leave balance' }).click()
+  await expect(page.getByRole('table').getByText('Annual Leave')).toBeVisible()
+  await sections.getByRole('link', { name: 'Account privileges' }).click()
+  await expect(page.getByText('No portal account linked')).toBeVisible()
+  await sections.getByRole('link', { name: 'Performance' }).click()
+  await expect(page.getByText('No performance reviews')).toBeVisible()
 })
 
 test('4. bulk import: preview shows row errors, then a clean file imports', async () => {
   mkdirSync('e2e/.tmp', { recursive: true })
-  const bad = 'first_name,last_name,email,joining_date,department\nOmar,Ali,omar@e2e.example.com,2026-02-01,Engineering\nBad,Row,bad@e2e.example.com,not-a-date,Nowhere\n'
+  const bad = 'first_name,last_name,email,joining_date,branch,department\nOmar,Ali,omar@e2e.example.com,2026-02-01,Head Office,Engineering\nBad,Row,bad@e2e.example.com,not-a-date,Head Office,Nowhere\n'
   writeFileSync('e2e/.tmp/people.csv', bad)
   await go('/employees')
   await page.getByRole('tab', { name: 'Bulk import', exact: true }).click()
@@ -122,7 +205,7 @@ test('5. check in and out from the dashboard', async () => {
   await page.getByRole('button', { name: 'Check out' }).click()
   await expect(page.getByRole('button', { name: 'Check in' })).toBeVisible()
   await go('/me/attendance')
-  await expect(page.getByRole('heading', { name: 'This month' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Monthly totals' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Daily hours' })).toBeVisible()
 })
 
@@ -168,12 +251,12 @@ test('8. payroll: add a salary, create a run, calculate and view the breakdown',
   await go('/employees')
   await page.getByPlaceholder('Search by name, ID, etc...').fill('sara')
   await page.getByRole('link', { name: 'Sara Khan' }).click()
-  await page.getByRole('tab', { name: 'Salary' }).click()
+  await page.getByRole('link', { name: 'Salary details' }).click()
   await page.getByRole('button', { name: 'New salary revision' }).click()
   await page.getByLabel('Effective from').fill('2026-01-01')
   await page.getByLabel(/Basic salary per pay period/).fill('100000')
   await page.getByRole('button', { name: 'Save revision' }).click()
-  await expect(page.getByText('PKR 100,000.00')).toBeVisible()
+  await expect(page.getByRole('definition').filter({ hasText: 'PKR 100,000.00' })).toBeVisible()
 
   await go('/payroll')
   await page.getByRole('button', { name: 'New payroll run' }).click()
@@ -182,7 +265,10 @@ test('8. payroll: add a salary, create a run, calculate and view the breakdown',
   await page.getByRole('button', { name: 'Calculate' }).click()
   await expect(page.getByRole('cell', { name: /Sara Khan/ })).toHaveCount(1)
   await expect(page.getByRole('cell', { name: '100,000.00' }).first()).toBeVisible()
-  await page.getByRole('cell', { name: /Sara Khan/ }).click()
+  await page.getByRole('link', { name: /Sara Khan/ }).click()
+  await expect(page.getByRole('heading', { name: 'Salary revision history' })).toBeVisible()
+  await page.getByRole('link', { name: 'Payroll run', exact: true }).click()
+  await page.getByRole('row', { name: /Sara Khan/ }).getByRole('button', { name: 'Payslip' }).click()
   await expect(page.getByRole('dialog').getByText('Basic salary')).toBeVisible()
   await expect(page.getByRole('dialog').getByText('Net pay')).toBeVisible()
   await page.keyboard.press('Escape')
@@ -203,7 +289,7 @@ test('salary template applies an increment to a selected employee', async () => 
   await editor.getByLabel('Increment (%)').fill('10')
   await editor.getByRole('button', { name: 'Create template' }).click()
   await expect(page.getByText('Engineering package')).toBeVisible()
-  await page.getByRole('button', { name: 'Apply', exact: true }).click()
+  await page.getByRole('button', { name: 'Apply Engineering package', exact: true }).click()
   const apply = page.getByRole('dialog', { name: 'Apply salary template' })
   await apply.getByLabel('Effective from').fill('2027-02-01')
   await apply.locator('label').filter({ hasText: 'Sara Khan' }).getByRole('checkbox').check()
@@ -229,7 +315,12 @@ test('request inbox shows a selectable record with connected details', async () 
   await page.getByRole('link', { name: /Time adjustment request/ }).first().click()
   await expect(page).toHaveURL(/\/me\/requests\/attendance\//)
   await expect(page.getByRole('heading', { name: 'Application info' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Open in Attendance' })).toBeVisible()
+  const requestUrl = page.url()
+  await page.getByRole('link', { name: 'Open in Attendance' }).click()
+  await expect(page).toHaveURL(/\/me\/attendance\?tab=adjust&status=all&record=/)
+  await expect(page.locator('main [tabindex="-1"]').filter({ hasText: 'Requested in' })).toBeFocused()
+  await page.goBack()
+  await expect(page).toHaveURL(requestUrl)
   await page.getByRole('link', { name: 'Back to my requests' }).click()
   await expect(page.getByRole('heading', { name: 'My requests' })).toBeVisible()
 })
@@ -263,16 +354,24 @@ test('11. hiring: open a job, take a public application, hire the candidate', as
   await visitor.getByRole('button', { name: 'Apply' }).click()
   await visitor.getByLabel('Full name').fill('Cara Candidate')
   await visitor.getByLabel('Email').fill('cara@e2e.example.com')
+  await visitor.getByLabel('Resume').setInputFiles({
+    name: 'resume.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\n'),
+  })
   await visitor.getByRole('button', { name: 'Submit application' }).click()
   await expect(visitor.getByText('Your application has been received')).toBeVisible()
   await visitor.context().close()
   await go('/hire')
   await expect(page.getByText('Cara Candidate')).toBeVisible()
   await page.getByRole('button', { name: 'Hire', exact: true }).click()
+  await page.getByLabel('Branch').selectOption({ label: 'Head Office' })
+  await page.getByLabel('Department').selectOption({ label: 'Engineering' })
   await page.getByRole('button', { name: 'Create employee' }).click()
   await expect(page.getByRole('heading', { name: 'Onboarding checklist' })).toBeVisible()
-  await expect(page.getByRole('dialog', { name: 'Employee profile walkthrough' })).toBeVisible()
-  await page.getByRole('button', { name: 'Skip walkthrough' }).click()
+  const profileGuide = page.getByRole('button', { name: 'Skip walkthrough' })
+  await profileGuide.waitFor({ state: 'visible', timeout: 2500 }).catch(() => {})
+  if (await profileGuide.isVisible()) await profileGuide.click()
   await page.getByRole('link', { name: 'Assign an asset' }).first().click()
   const employeeId = new URL(page.url()).searchParams.get('employee_id')
   await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible()
@@ -307,8 +406,12 @@ test('13. mobile layout: the navigation drawer opens and works', async () => {
   await page.getByRole('button', { name: 'Open navigation' }).click()
   await page.getByRole('dialog').getByRole('link', { name: 'Employees', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Employees', exact: true })).toBeVisible()
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
-  expect(overflow).toBe(false)
+  for (const path of ['/employees', '/me', '/me/attendance', '/me/security']) {
+    await go(path)
+    await expect(page.locator('main h1').first()).toBeVisible()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+    expect(overflow, path).toBe(false)
+  }
 })
 
 test('14. a second organization cannot see another organization data', async ({ browser }) => {
@@ -320,7 +423,7 @@ test('14. a second organization cannot see another organization data', async ({ 
   await other.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await other.getByLabel('Organization name').fill('Other Org')
   await other.getByRole('button', { name: 'Create account' }).click()
-  await expect(other.getByText('Check your inbox')).toBeVisible()
+  await expect(other.getByRole('heading', { name: 'Your registration is ready' })).toBeVisible()
   await other.goto('/login')
   await other.getByLabel('Work email').fill(email)
   await other.getByLabel('Password').fill(PASSWORD)

@@ -23,9 +23,11 @@ from app.modules.employees.models import (
     EmployeeAssignment,
     EmployeeLifecycleEvent,
 )
+from app.modules.leave.models import LeaveType
 from app.modules.organization.models import Branch, Department, Designation
+from app.modules.payroll.models import SalaryTemplate
 from app.modules.tenancy import service as tenancy
-from app.modules.tenancy.models import Tenant
+from app.modules.tenancy.models import AuditLog, Tenant
 
 DEFAULT_CHECKLIST = [
     "Collect identification documents", "Sign employment contract", "Create work email account",
@@ -33,7 +35,7 @@ DEFAULT_CHECKLIST = [
 ]
 LIFECYCLE_TYPES = {
     "confirmation", "promotion", "transfer", "suspension", "reinstatement", "resignation", "termination",
-    "retirement", "rehire", "contract_renewal", "probation_extension",
+    "retirement", "rehire", "contract_renewal", "probation_extension", "deactivation",
 }
 
 
@@ -100,6 +102,12 @@ def _check_refs(db: Session, branch_id, department_id, designation_id, manager_i
                                    code="manager_cycle")
 
 
+def _check_designation_department(db: Session, designation_id, department_id) -> None:
+    designation = db.get(Designation, designation_id) if designation_id else None
+    if designation and designation.department_id and designation.department_id != department_id:
+        raise ValidationFailed("Select a designation in the employee's department", details=[{"field": "designation_id"}])
+
+
 def _live_count(db: Session) -> int:
     return db.scalar(select(func.count()).select_from(Employee).where(
         Employee.deleted_at.is_(None), Employee.status.in_(LIVE_STATUSES))) or 0
@@ -129,7 +137,31 @@ def _event(db: Session, emp: Employee, kind: str, on: date, actor: uuid.UUID | N
 
 
 # ------------------------------------------------------------------ create / update
+SETUP_REQUIREMENTS = {
+    "branch": ("an active branch", select(Branch.id).where(Branch.is_active.is_(True))),
+    "department": ("an active department", select(Department.id).where(Department.is_active.is_(True))),
+    # Reading the policy can create defaults. A saved policy is recorded explicitly in the audit log.
+    "attendance_policy": (
+        "a saved attendance policy", select(AuditLog.id).where(AuditLog.action == "attendance.policy_updated"),
+    ),
+    "leave_type": ("an active leave type", select(LeaveType.id).where(LeaveType.is_active.is_(True))),
+    "payroll": ("an active salary template", select(SalaryTemplate.id).where(SalaryTemplate.is_active.is_(True))),
+}
+
+
+def missing_setup(db: Session) -> list[str]:
+    return [key for key, (_, query) in SETUP_REQUIREMENTS.items() if db.scalar(query.limit(1)) is None]
+
+
+def require_setup(db: Session) -> None:
+    missing = missing_setup(db)
+    if missing:
+        labels = ", ".join(SETUP_REQUIREMENTS[key][0] for key in missing)
+        raise Conflict(f"Employee setup requires {labels}.", code="employee_setup_required", details=missing)
+
+
 def create_employee(db: Session, *, tenant: Tenant, actor: uuid.UUID, data: dict, ip: str | None = None) -> Employee:
+    require_setup(db)
     _check_capacity(db, tenant)
     code = (data.get("employee_code") or "").strip() or next_code(db)
     if db.scalar(select(func.count()).select_from(Employee).where(Employee.employee_code == code)):
@@ -138,8 +170,13 @@ def create_employee(db: Session, *, tenant: Tenant, actor: uuid.UUID, data: dict
     if email and db.scalar(select(func.count()).select_from(Employee).where(
             Employee.email == email, Employee.deleted_at.is_(None))):
         raise Conflict("An employee with this email already exists", code="duplicate_email")
-    _check_refs(db, data.get("branch_id"), data.get("department_id"), data.get("designation_id"),
-                data.get("manager_id"))
+    for model, field in ((Branch, "branch"), (Department, "department")):
+        field_id = f"{field}_id"
+        placement = db.get(model, data[field_id]) if data.get(field_id) else None
+        if placement is None or not placement.is_active:
+            raise ValidationFailed(f"Select an active {field}", details=[{"field": field_id}])
+    _check_refs(db, None, None, data.get("designation_id"), data.get("manager_id"))
+    _check_designation_department(db, data.get("designation_id"), data.get("department_id"))
     fields = {k: v for k, v in data.items() if k not in {"employee_code", "email"}}
     fields.setdefault("status", "active")
     fields.setdefault("employment_type", "full_time")
@@ -172,6 +209,9 @@ def update_employee(db: Session, *, tenant: Tenant, actor: uuid.UUID, emp: Emplo
         _check_refs(db, changes.get("branch_id", emp.branch_id), changes.get("department_id", emp.department_id),
                     changes.get("designation_id", emp.designation_id), changes.get("manager_id", emp.manager_id),
                     self_id=emp.id)
+    if "designation_id" in changes and changes["designation_id"] != emp.designation_id:
+        _check_designation_department(db, changes.get("designation_id", emp.designation_id),
+                                      changes.get("department_id", emp.department_id))
     if "status" in changes and changes["status"] not in STATUSES:
         raise ValidationFailed("Unknown status", details=[{"field": "status"}])
     placement_changed = any(k in changes and changes[k] != getattr(emp, k) for k in org_keys)
@@ -213,15 +253,22 @@ def record_lifecycle(db: Session, *, tenant: Tenant, actor: uuid.UUID, emp: Empl
     elif event_type == "promotion":
         if not d.get("designation_id"):
             raise ValidationFailed("designation_id is required", details=[{"field": "details.designation_id"}])
-        _check_refs(db, None, None, uuid.UUID(d["designation_id"]), None)
+        designation_id = uuid.UUID(d["designation_id"])
+        _check_refs(db, None, None, designation_id, None)
+        _check_designation_department(db, designation_id, emp.department_id)
         _close_assignment(db, emp, effective_date)
-        emp.designation_id = uuid.UUID(d["designation_id"])
+        emp.designation_id = designation_id
         db.flush()
         _open_assignment(db, emp, effective_date)
     elif event_type == "transfer":
         ids = {k: (uuid.UUID(d[k]) if d.get(k) else getattr(emp, k)) for k in
                ("branch_id", "department_id", "manager_id")}
         _check_refs(db, ids["branch_id"], ids["department_id"], None, ids["manager_id"], self_id=emp.id)
+        if d.get("designation_id"):
+            designation_id = uuid.UUID(d["designation_id"])
+            _check_refs(db, None, None, designation_id, None)
+            _check_designation_department(db, designation_id, ids["department_id"])
+            ids["designation_id"] = designation_id
         _close_assignment(db, emp, effective_date)
         for k, v in ids.items():
             setattr(emp, k, v)
@@ -239,10 +286,11 @@ def record_lifecycle(db: Session, *, tenant: Tenant, actor: uuid.UUID, emp: Empl
             EmployeeLifecycleEvent.employee_id == emp.id, EmployeeLifecycleEvent.event_type == "suspension"
         ).order_by(EmployeeLifecycleEvent.created_at.desc()))
         emp.status = (last.details.get("previous_status") if last else None) or "active"
-    elif event_type in ("resignation", "termination", "retirement"):
+    elif event_type in ("resignation", "termination", "retirement", "deactivation"):
         if emp.status not in LIVE_STATUSES:
             raise Conflict("Employee has already left", code="invalid_transition")
-        emp.status = {"resignation": "resigned", "termination": "terminated", "retirement": "retired"}[event_type]
+        emp.status = {"resignation": "resigned", "termination": "terminated", "retirement": "retired",
+                      "deactivation": "inactive"}[event_type]
         emp.exit_date = effective_date
         _close_assignment(db, emp, effective_date)
     elif event_type == "rehire":
@@ -284,7 +332,8 @@ def list_employees(db: Session, *, allowed: set[uuid.UUID] | None, branch_id=Non
         stmt = stmt.where(Employee.status == status)
     if q:
         like = f"%{q.strip().lower()}%"
-        stmt = stmt.where(or_(func.lower(Employee.first_name).like(like), func.lower(Employee.last_name).like(like),
+        full_name = Employee.first_name + " " + Employee.last_name
+        stmt = stmt.where(or_(func.lower(full_name).like(like),
                               func.lower(Employee.email).like(like), Employee.employee_code.like(like),
                               Employee.bio_id.like(like), Employee.phone.like(like)))
     if letter and re.fullmatch(r"[A-Za-z]", letter):
@@ -388,8 +437,9 @@ def _parse_date(v) -> date | None:
 
 
 def validate_import(db: Session, tenant: Tenant, records: list[dict]) -> dict:
-    branches = {b.name.lower(): b.id for b in db.scalars(select(Branch))}
-    depts = {d.name.lower(): d.id for d in db.scalars(select(Department))}
+    require_setup(db)
+    branches = {b.name.lower(): b.id for b in db.scalars(select(Branch).where(Branch.is_active.is_(True)))}
+    depts = {d.name.lower(): d.id for d in db.scalars(select(Department).where(Department.is_active.is_(True)))}
     desigs: dict[str, list[uuid.UUID]] = {}
     for d in db.scalars(select(Designation)):
         desigs.setdefault(d.name.lower(), []).append(d.id)
@@ -452,6 +502,8 @@ def validate_import(db: Session, tenant: Tenant, records: list[dict]) -> dict:
                     row[f"{key}_id"] = lookup[name.lower()]
                 else:
                     errors.append(f"unknown {label} '{name}'")
+            else:
+                errors.append(f"{label} is required")
         dname = (rec.get("designation") or "").strip().lower()
         if dname:
             ids = desigs.get(dname, [])
